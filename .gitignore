@@ -1,0 +1,37 @@
+# Local toolchains and generated output
+.tools/
+.playwright-cli/
+output/
+.idea/
+.vscode/
+
+# .NET
+**/bin/
+**/obj/
+*.user
+*.suo
+.vs/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
+frontend/vitest.config.js
+frontend/vitest.config.d.ts
+
+# Local packages and logs
+*.log
+TestResults/
+artifacts/
+*.zip
+*.sha256
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Reference media is kept locally and is not source code
+*.mp4

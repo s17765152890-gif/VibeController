@@ -1,0 +1,32 @@
+:root {
+  color-scheme: light;
+  font-family: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  font-optical-sizing: auto;
+
+  --canvas: #f3f3f5;
+  --canvas-warm: #f8f7f4;
+  --surface: rgba(255, 255, 255, 0.72);
+  --surface-solid: #ffffff;
+  --surface-muted: rgba(245, 245, 247, 0.8);
+  --ink: #18191c;
+  --ink-secondary: #62646b;
+  --ink-tertiary: #92949b;
+  --hairline: rgba(24, 25, 28, 0.09);
+  --highlight: rgba(255, 255, 255, 0.9);
+  --green: #248a57;
+  --green-soft: #e7f4ec;
+  --amber: #a86614;
+  --amber-soft: #fbf0dc;
+  --red: #c64242;
+  --red-soft: #fae9e8;
+  --blue: #3373dc;
+  --blue-soft: #e9f0fd;
+  --shadow-sm: 0 1px 2px rgba(20, 22, 26, 0.04), 0 6px 18px rgba(20, 22, 26, 0.05);
+  --shadow-lg: 0 2px 3px rgba(20, 22, 26, 0.04), 0 24px 70px rgba(20, 22, 26, 0.09);
+  --radius-sm: 10px;
+  --radius-md: 16px;
+  --radius-lg: 26px;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
