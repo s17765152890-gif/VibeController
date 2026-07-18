@@ -3,7 +3,10 @@ using VibeController.Core.Domain;
 
 namespace VibeController.Infrastructure.Windows;
 
-public sealed class DualSenseControllerAdapter : IControllerAdapter, IDisposable
+public sealed class DualSenseControllerAdapter :
+    IControllerAdapter,
+    IControllerLightbar,
+    IDisposable
 {
     private readonly IDualSenseHidApi _api;
     private int _controllerIndex = -1;
@@ -81,6 +84,9 @@ public sealed class DualSenseControllerAdapter : IControllerAdapter, IDisposable
         _disposed = true;
         _api.Dispose();
     }
+
+    public void SetLightbarColor(ControllerLightbarColor color) =>
+        _api.SetLightbarColor(color);
 
     private void Reset(int controllerIndex)
     {

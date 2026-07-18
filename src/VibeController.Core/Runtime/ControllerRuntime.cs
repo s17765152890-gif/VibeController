@@ -113,10 +113,15 @@ public sealed class ControllerRuntime : IDisposable
             _lastPacketNumber = read.PacketNumber;
             _hasPacket = true;
         }
-        else
-        {
-            inputEvents.AddRange(DetectHeldContinuousInput(read.Snapshot, timestamp));
-        }
+
+        var changedControls = inputEvents
+            .Where(item => item.Edge == InputEdge.Changed)
+            .Select(item => item.Control)
+            .ToHashSet();
+        inputEvents.AddRange(DetectHeldContinuousInput(
+            read.Snapshot,
+            timestamp,
+            changedControls));
 
         var rightStickGesture = _rightStickGestures.Detect(read.Snapshot, timestamp);
         if (rightStickGesture is not null)
@@ -183,9 +188,12 @@ public sealed class ControllerRuntime : IDisposable
 
     private static IReadOnlyList<InputEvent> DetectHeldContinuousInput(
         ControllerSnapshot snapshot,
-        DateTimeOffset timestamp) => ContinuousControls
+        DateTimeOffset timestamp,
+        IReadOnlySet<ControllerControl> alreadyEmitted) => ContinuousControls
         .Select(control => (Control: control, Value: snapshot.GetValue(control)))
-        .Where(item => MathF.Abs(item.Value) > 0.001f)
+        .Where(item =>
+            !alreadyEmitted.Contains(item.Control) &&
+            MathF.Abs(item.Value) > 0.001f)
         .Select(item => new InputEvent(item.Control, InputEdge.Changed, item.Value, timestamp))
         .ToArray();
 

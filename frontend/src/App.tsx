@@ -43,20 +43,25 @@ export default function App() {
             scrollSpeed: Math.round(state.configuration.scrollSpeed),
             deadZone: state.configuration.deadZone,
             startWithWindows: state.configuration.startWithWindows,
+            codexLightbarEnabled: state.configuration.codexLightbarEnabled ?? false,
           } : undefined}
+          microphone={state.configuration?.microphone}
+          codexHook={state.configuration?.codexHook}
+          codexActivity={state.configuration?.codexActivity}
           onSave={(settings) => {
             setState((current) => ({
               ...current,
               lastAction: settings.controllerType === current.configuration?.controllerType
                 ? current.lastAction
                 : null,
-              configuration: {
+              configuration: current.configuration ? {
+                ...current.configuration,
                 ...settings,
-                mappings: current.configuration?.mappings ?? {},
-              },
+              } : current.configuration,
             }));
             appBridge.send("updateSettings", settings);
           }}
+          onRefreshIntegrations={() => appBridge.send("refreshIntegrations", {})}
           onCopyDiagnostics={() => {
             void navigator.clipboard?.writeText(JSON.stringify({ version: "0.1.0", runtime: state }, null, 2));
             appBridge.send("requestState", { copyDiagnostics: true });

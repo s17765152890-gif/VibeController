@@ -114,6 +114,22 @@ public sealed class ControllerRuntimeTests
     }
 
     [Fact]
+    public async Task Tick_HeldStickContinuesMouseMovementWhenPacketNumbersAdvance()
+    {
+        var held = ControllerSnapshot.Empty.With(ControllerControl.LeftStickX, 0.6f);
+        var adapter = new QueueControllerAdapter(
+            Connected(1, held), Connected(2, held), Connected(3, held));
+        var executor = new RecordingExecutor();
+        var runtime = CreateRuntime(adapter, executor);
+
+        await runtime.TickAsync(Options, DateTimeOffset.UnixEpoch);
+        await runtime.TickAsync(Options, DateTimeOffset.UnixEpoch.AddMilliseconds(16));
+        await runtime.TickAsync(Options, DateTimeOffset.UnixEpoch.AddMilliseconds(32));
+
+        Assert.Equal(3, executor.Invocations.Count(item => item.Action.Kind == MappedActionKind.MouseMove));
+    }
+
+    [Fact]
     public async Task Tick_HeldRightStickDirectionRepeatsUntilNeutral()
     {
         var right = ControllerSnapshot.Empty.With(ControllerControl.RightStickX, 0.85f);

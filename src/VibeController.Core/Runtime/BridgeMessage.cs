@@ -25,7 +25,11 @@ public sealed record RuntimeConfigurationPayload(
     float ScrollSpeed,
     float DeadZone,
     bool StartWithWindows,
-    IReadOnlyDictionary<string, string> Mappings);
+    IReadOnlyDictionary<string, string> Mappings,
+    bool CodexLightbarEnabled = false,
+    MicrophoneStatus? Microphone = null,
+    CodexHookRegistrationStatus? CodexHook = null,
+    CodexActivityStatus? CodexActivity = null);
 
 public static class BridgeMessageFactory
 {
