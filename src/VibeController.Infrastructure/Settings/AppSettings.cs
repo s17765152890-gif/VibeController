@@ -28,6 +28,8 @@ public sealed record AppSettings
 
     public bool StartWithWindows { get; init; }
 
+    public bool CodexLightbarEnabled { get; init; }
+
     public MappingProfile Profile { get; init; } = DefaultProfileFactory.Create();
 
     public static AppSettings CreateDefault() => new()
@@ -42,6 +44,7 @@ public sealed record AppSettings
         RepeatDelayMilliseconds = 350,
         RepeatIntervalMilliseconds = 90,
         StartWithWindows = false,
+        CodexLightbarEnabled = false,
         Profile = DefaultProfileFactory.Create(),
     };
 }

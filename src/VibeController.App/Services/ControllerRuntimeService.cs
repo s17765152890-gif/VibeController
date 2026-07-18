@@ -1,9 +1,12 @@
 using System.Diagnostics;
+using System.IO;
 using System.Text.Json;
+using VibeController.Core.Devices;
 using VibeController.Core.Domain;
 using VibeController.Core.Execution;
 using VibeController.Core.Mapping;
 using VibeController.Core.Runtime;
+using VibeController.Infrastructure.Codex;
 using VibeController.Infrastructure.Settings;
 using VibeController.Infrastructure.Windows;
 
@@ -11,21 +14,51 @@ namespace VibeController.App.Services;
 
 public sealed class ControllerRuntimeService : IAsyncDisposable
 {
+    private static readonly TimeSpan IntegrationPollInterval = TimeSpan.FromMilliseconds(250);
     private readonly ISettingsStore _settingsStore;
+    private readonly IAudioInputDetector _audioInputDetector;
+    private readonly CodexActivityStore _codexActivityStore;
+    private readonly CodexHookInstaller _codexHookInstaller;
     private readonly CancellationTokenSource _cancellation = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
     private AppSettings _settings = AppSettings.CreateDefault();
     private ControllerRuntime? _runtime;
+    private IControllerLightbar? _lightbar;
     private Task? _loop;
     private bool _testMode;
     private string? _lastJson;
     private bool _stateDirty = true;
+    private DateTimeOffset _nextIntegrationPoll = DateTimeOffset.MinValue;
+    private CodexActivityLightbarAnimation _lightbarAnimation = new();
+    private MicrophoneStatus _microphoneStatus = new(
+        MicrophoneDetectionState.Error,
+        null,
+        [],
+        false,
+        "尚未检测 Windows 录音设备");
+    private CodexHookRegistrationStatus _codexHookStatus = new(
+        Enabled: false,
+        Installed: false,
+        ErrorMessage: null);
+    private CodexActivityStatus _codexActivity = new(
+        CodexActivityState.Idle,
+        LastEventAt: null,
+        ActiveSessionCount: 0);
 
     public event Action<string>? StateJsonReady;
 
     public ControllerRuntimeService(ISettingsStore settingsStore)
     {
         _settingsStore = settingsStore;
+        var localDataDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "VibeController");
+        _audioInputDetector = new WindowsAudioInputDetector();
+        _codexActivityStore = new CodexActivityStore(
+            Path.Combine(localDataDirectory, CodexActivityStore.StateFileName));
+        _codexHookInstaller = new CodexHookInstaller(Path.Combine(
+            CodexHomeLocator.GetCurrent(),
+            "hooks.json"));
     }
 
     public string? CurrentStateJson => _lastJson;
@@ -40,6 +73,7 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
     public async Task StartAsync()
     {
         _settings = await _settingsStore.LoadAsync(_cancellation.Token);
+        RefreshIntegrations();
         RebuildRuntime();
         _loop = RunLoopAsync(_cancellation.Token);
     }
@@ -85,6 +119,9 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
                 case "requestState":
                     PublishCurrent();
                     break;
+                case "refreshIntegrations":
+                    RefreshIntegrations();
+                    break;
             }
         }
         finally
@@ -110,11 +147,17 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
             try
             {
                 if (_runtime is null) continue;
+                var timestamp = DateTimeOffset.UtcNow;
                 var result = await _runtime.TickAsync(
                     CreateOptions(),
-                    DateTimeOffset.UtcNow,
+                    timestamp,
                     cancellationToken);
-                if (!_stateDirty && !result.ConnectionChanged && result.InputEvents.Count == 0)
+                var integrationChanged = PollCodexActivity(timestamp);
+                ApplyLightbarColor(timestamp);
+                if (!_stateDirty &&
+                    !integrationChanged &&
+                    !result.ConnectionChanged &&
+                    result.InputEvents.Count == 0)
                 {
                     continue;
                 }
@@ -163,15 +206,20 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
             new WindowsInputApi(),
             codex,
             new CodexShortcutResolver());
+        var adapter = WindowsControllerAdapterFactory.Create(_settings.ControllerType);
+        _lightbar = adapter as IControllerLightbar;
+        _lightbarAnimation = new CodexActivityLightbarAnimation();
         _runtime = new ControllerRuntime(
-            WindowsControllerAdapterFactory.Create(_settings.ControllerType),
+            adapter,
             new ActionDispatcher(codex, executor),
             _settings.Profile);
+        ApplyLightbarColor(DateTimeOffset.UtcNow);
     }
 
     private async Task UpdateSettingsAsync(JsonElement payload)
     {
         var previousControllerType = _settings.ControllerType;
+        var previousLightbarEnabled = _settings.CodexLightbarEnabled;
         var controllerType = previousControllerType;
         if (payload.TryGetProperty("controllerType", out var controllerTypeElement) &&
             Enum.TryParse<ControllerType>(
@@ -192,12 +240,20 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
             ScrollSpeed = payload.GetProperty("scrollSpeed").GetSingle() / 6.25f,
             ActiveControllerIndex = payload.GetProperty("activeControllerIndex").GetInt32(),
             DictationShortcut = ParseShortcut(payload.GetProperty("dictationShortcut").GetString() ?? "Ctrl+Alt+Shift+F12"),
+            CodexLightbarEnabled = payload.TryGetProperty("codexLightbarEnabled", out var lightbarEnabled)
+                ? lightbarEnabled.GetBoolean()
+                : previousLightbarEnabled,
         };
         _stateDirty = true;
 
         if (controllerType != previousControllerType)
         {
             RebuildRuntime();
+        }
+
+        if (_settings.CodexLightbarEnabled != previousLightbarEnabled)
+        {
+            ConfigureCodexHooks();
         }
 
         var executablePath = Environment.ProcessPath;
@@ -323,7 +379,79 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
         _settings.StartWithWindows,
         _settings.Profile.Mappings.ToDictionary(
             pair => FormatControl(pair.Key),
-            pair => MappedActionCodec.Format(pair.Value)));
+            pair => MappedActionCodec.Format(pair.Value)),
+        _settings.CodexLightbarEnabled,
+        _microphoneStatus,
+        _codexHookStatus,
+        _codexActivity);
+
+    private void RefreshIntegrations()
+    {
+        var timestamp = DateTimeOffset.UtcNow;
+        _microphoneStatus = _audioInputDetector.Detect();
+        ConfigureCodexHooks();
+
+        _codexActivity = _codexActivityStore.ReadStatus(timestamp);
+        _nextIntegrationPoll = timestamp.Add(IntegrationPollInterval);
+        _stateDirty = true;
+        _lightbarAnimation = new CodexActivityLightbarAnimation();
+        ApplyLightbarColor(timestamp);
+    }
+
+    private void ConfigureCodexHooks()
+    {
+        var executablePath = Environment.ProcessPath ?? string.Empty;
+        _codexHookStatus = _codexHookInstaller.SetEnabled(
+            _settings.CodexLightbarEnabled,
+            executablePath);
+        _stateDirty = true;
+        if (!_settings.CodexLightbarEnabled)
+        {
+            _lightbar?.SetLightbarColor(new ControllerLightbarColor(0, 0, 0));
+            _lightbarAnimation = new CodexActivityLightbarAnimation();
+        }
+        else
+        {
+            _lightbarAnimation = new CodexActivityLightbarAnimation();
+            ApplyLightbarColor(DateTimeOffset.UtcNow);
+        }
+    }
+
+    private bool PollCodexActivity(DateTimeOffset timestamp)
+    {
+        if (timestamp < _nextIntegrationPoll)
+        {
+            return false;
+        }
+
+        _nextIntegrationPoll = timestamp.Add(IntegrationPollInterval);
+        var activity = _codexActivityStore.ReadStatus(timestamp);
+        if (activity == _codexActivity)
+        {
+            return false;
+        }
+
+        _codexActivity = activity;
+        return true;
+    }
+
+    private void ApplyLightbarColor(DateTimeOffset timestamp)
+    {
+        if (!_settings.CodexLightbarEnabled || _lightbar is null)
+        {
+            return;
+        }
+
+        var color = _lightbarAnimation.GetNextColor(
+            _codexActivity.State,
+            timestamp);
+        if (color is not { } nextColor)
+        {
+            return;
+        }
+
+        _lightbar.SetLightbarColor(nextColor);
+    }
 
     private static string FormatControl(ControllerControl control) => control switch
     {

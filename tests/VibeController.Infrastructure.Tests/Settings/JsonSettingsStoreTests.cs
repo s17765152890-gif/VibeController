@@ -24,6 +24,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
             ActiveControllerIndex = 2,
             MappingEnabled = false,
             CodexOnly = false,
+            CodexLightbarEnabled = false,
             MouseSpeed = 18f,
             Profile = profile,
         };
@@ -35,6 +36,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
         Assert.Equal(expected.ActiveControllerIndex, actual.ActiveControllerIndex);
         Assert.Equal(expected.MappingEnabled, actual.MappingEnabled);
         Assert.Equal(expected.CodexOnly, actual.CodexOnly);
+        Assert.Equal(expected.CodexLightbarEnabled, actual.CodexLightbarEnabled);
         Assert.Equal(expected.MouseSpeed, actual.MouseSpeed);
         Assert.True(actual.Profile.TryGetAction(ControllerControl.View, out var action));
         Assert.Equal(MappedActionKind.KeyboardShortcut, action.Kind);
@@ -65,6 +67,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
 
         Assert.True(settings.MappingEnabled);
         Assert.True(settings.CodexOnly);
+        Assert.False(settings.CodexLightbarEnabled);
         Assert.Equal("F12", settings.DictationShortcut.Key);
         Assert.Equal(
             [KeyModifier.Control, KeyModifier.Alt, KeyModifier.Shift],

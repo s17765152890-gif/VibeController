@@ -1,5 +1,27 @@
 export type ConnectionState = "unknown" | "connected" | "disconnected";
 export type ControllerType = "xbox" | "playStation5";
+export type MicrophoneDetectionState = "available" | "noDevices" | "error";
+export type CodexActivityState = "idle" | "working" | "needsAttention" | "completed";
+
+export interface MicrophoneStatus {
+  state: MicrophoneDetectionState;
+  defaultDeviceName: string | null;
+  deviceNames: string[];
+  dualSenseMicrophoneAvailable: boolean;
+  message: string | null;
+}
+
+export interface CodexHookRegistrationStatus {
+  enabled: boolean;
+  installed: boolean;
+  errorMessage: string | null;
+}
+
+export interface CodexActivityStatus {
+  state: CodexActivityState;
+  lastEventAt: string | null;
+  activeSessionCount: number;
+}
 
 export interface RuntimeStatePayload {
   connectionState: ConnectionState;
@@ -22,6 +44,10 @@ export interface RuntimeConfiguration {
   deadZone: number;
   startWithWindows: boolean;
   mappings: Record<string, string>;
+  codexLightbarEnabled?: boolean;
+  microphone?: MicrophoneStatus;
+  codexHook?: CodexHookRegistrationStatus;
+  codexActivity?: CodexActivityStatus;
 }
 
 export interface RuntimeStateMessage {
@@ -38,6 +64,7 @@ export type CommandType =
   | "updateMapping"
   | "updateSettings"
   | "resetDefaults"
+  | "refreshIntegrations"
   | "requestState";
 
 export interface BridgeCommand<TPayload = unknown> {

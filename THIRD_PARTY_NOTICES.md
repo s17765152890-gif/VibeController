@@ -22,3 +22,9 @@ Xbox、Microsoft、PlayStation、DualSense、Codex、OpenAI 及其他标志分�
 ## Open-source dependencies / 开源依赖
 
 VibeController uses NuGet and npm packages under their respective licenses. Exact package names and versions are recorded in the project files and `frontend/package-lock.json`. Redistribution must continue to respect those upstream licenses and notices.
+
+## Protocol references / 协议参考
+
+The independently written DualSense output-report encoder was verified against the report layout, flags, and CRC behavior documented by Linux [`hid-playstation`](https://github.com/torvalds/linux/blob/master/drivers/hid/hid-playstation.c), licensed GPL-2.0-or-later. No Linux driver source is compiled into or distributed with VibeController.
+
+本项目独立编写的 DualSense 输出报告编码器，使用 Linux [`hid-playstation`](https://github.com/torvalds/linux/blob/master/drivers/hid/hid-playstation.c)（GPL-2.0-or-later）核对报告布局、标志位与 CRC 行为；VibeController 不编译或分发该驱动源码。

@@ -27,7 +27,10 @@ VibeController 是一款面向 Windows 的开源桌面工具。它读取 Xbox Se
 - Codex 语义动作不是写死的快捷键：首次触发时读取 Codex 当前快捷键，并在配置变化后自动刷新。
 - 支持听写、发送、命令菜单、任务/最近任务/标签页切换和推理强度调节。
 - 左摇杆移动鼠标，扳机键点击；DualSense 触控板移动鼠标，按下执行左键单击。
+- Xbox 与 DualSense 摇杆都按运行帧持续输出，按住移动时不会因 HID 报告抖动阈值而断续。
 - 右摇杆模拟方向键，可按住连续移动输入框光标。
+- 设置页可检查 Windows 默认录音端点，并提示 DualSense 麦克风是否实际暴露给系统。
+- 可选的 Codex Hook 状态桥接：DualSense 灯条用蓝色、琥珀色和绿色表示工作中、等待操作和已完成。
 - 默认只在 Codex 位于前台时注入输入，另有暂停映射和无注入测试模式。
 - 本地 JSON 配置、系统托盘、自动重连和开机启动选项。
 
@@ -39,8 +42,8 @@ VibeController 是一款面向 Windows 的开源桌面工具。它读取 Xbox Se
 
 要求：Windows 10 22H2 或 Windows 11，x64。发布包已包含 .NET 运行时，但仍需要 [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)；Windows 11 通常已预装。
 
-1. 从 [Releases](https://github.com/Mrjie7205/VibeController/releases/latest) 下载 `VibeController-v1.0.0-win-x64.zip` 和同名 `.sha256` 文件。
-2. 可选但推荐：执行 `Get-FileHash .\VibeController-v1.0.0-win-x64.zip -Algorithm SHA256`，与校验文件比较。
+1. 从 [Releases](https://github.com/Mrjie7205/VibeController/releases/latest) 下载 `VibeController-v1.1.0-win-x64.zip` 和同名 `.sha256` 文件。
+2. 可选但推荐：执行 `Get-FileHash .\VibeController-v1.1.0-win-x64.zip -Algorithm SHA256`，与校验文件比较。
 3. 完整解压 ZIP，不要直接在压缩包内运行。
 4. 在 Windows 中通过蓝牙、USB 或 Xbox Wireless Adapter 连接手柄。
 5. 运行 `VibeController.App.exe`，在“设置”中选择 Xbox 或 PS5，再用“测试输入”确认按键。
@@ -58,6 +61,21 @@ VibeController 是一款面向 Windows 的开源桌面工具。它读取 Xbox Se
 用户自定义绑定优先于 Codex 默认绑定；文件改变后会自动重新读取。如果 Codex 中明确取消了某项绑定、该操作没有默认快捷键，或快捷键格式暂不支持，VibeController 会在界面显示错误，而不会发送一个过时的固定按键。
 
 Codex 当前通常未给“切换听写”和“提高/降低推理强度”分配默认快捷键。第一次使用这些动作前，请在 **Codex → 设置 → 键盘快捷键** 中为它们设置普通组合键。其他用户可以使用不同组合键，无需在 VibeController 里重复配置。
+
+### 听写麦克风与 DualSense 状态灯
+
+设置页的“听写与状态灯”区域会列出 Windows 当前默认录音端点，并检查活动录音设备中是否存在 DualSense / Wireless Controller。该检测只读取设备 ID 和显示名称，不打开麦克风、不录音；真正的语音识别仍由 Codex 原生听写完成。标准蓝牙连接通常不会向 Windows 暴露 DualSense 麦克风，此时请使用电脑麦克风，或改用能暴露该音频端点的有线连接。
+
+“使用 DualSense 灯条显示 Codex 状态”默认关闭。开启并保存后，VibeController 会把自己的命令处理器合并到 `$CODEX_HOME\hooks.json`；未设置 `CODEX_HOME` 时使用 `%USERPROFILE%\.codex\hooks.json`。首次修改已有文件时会保留 `hooks.json.vibecontroller.bak`：
+
+| 灯条 | Codex 状态 |
+| --- | --- |
+| 蓝色 | 正在处理任务 |
+| 琥珀色 | 等待权限或用户操作 |
+| 绿色（8 秒） | 本轮任务已完成 |
+| 暗蓝 | 空闲 |
+
+首次触发非托管 Hook 时，Codex 可能要求信任配置。关闭该开关会只移除 VibeController 自己的处理器，不改动其他 Hook。Hook 状态文件只保存会话 ID、工作目录、状态和时间戳，不保存提示词、回复或工具输入输出。
 
 ### 默认映射
 
@@ -93,7 +111,7 @@ Codex 前台安全检查
 Windows 键盘 / 鼠标 / 窗口操作
 ```
 
-这是 Windows 输入映射工具，不依赖 Codex 私有 API。设置保存于 `%LOCALAPPDATA%\VibeController\settings.json`。应用不请求麦克风权限，不录音，也不读取或保存 Codex 对话文本。
+这是 Windows 输入映射工具，不依赖 Codex 私有 API。设置保存于 `%LOCALAPPDATA%\VibeController\settings.json`。应用只枚举 Windows 录音端点的名称，不打开麦克风、不录音，也不读取或保存 Codex 对话文本。只有用户主动开启状态灯功能时，应用才会安装上述 Codex Hook。
 
 ### 从源码构建
 
@@ -110,8 +128,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1
 自包含输出位于 `artifacts\win-x64`。生成与官方 Release 相同结构的 ZIP：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -Version 1.0.0
-powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-release.ps1 -Version 1.0.0
+powershell -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -Version 1.1.0
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-release.ps1 -Version 1.1.0
 ```
 
 架构、开发约定和 PR 要求见 [CONTRIBUTING.md](CONTRIBUTING.md)。实体设备测试见 [硬件验收清单](docs/testing/hardware-checklist.md)。
@@ -121,6 +139,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-release.ps1 -Versi
 - 仅支持 Windows x64；暂未提供安装器、自动更新或代码签名。
 - Xbox 走 XInput；部分系统保留键（如 Guide）不作为核心输入。
 - DualSense 的 USB/蓝牙报告解析和触控板行为已有自动化测试，但不同固件与蓝牙适配器仍需要更多实体设备反馈。
+- DualSense 灯条的 USB/蓝牙输出报告与 CRC 已有自动化测试；不同固件、蓝牙栈以及共享 HID 写权限仍需按硬件清单验收。
+- 普通 DualSense 蓝牙配对通常只提供手柄 HID，不提供麦克风音频端点；VibeController 不尝试绕过 Windows 的音频设备能力。
 - 未来计划包括 TCL 遥控器、配置档案、组合/长按动作以及更多通用 HID 设备。
 
 ### 许可证与声明
@@ -142,6 +162,9 @@ VibeController is an open-source Windows desktop utility that turns input from a
 - Codex semantic actions resolve the user's current Codex shortcuts on first use and refresh after the file changes—no universal hard-coded shortcut assumptions.
 - Dictation, submit, command menu, thread/recent-thread/tab navigation, and reasoning-effort actions.
 - Left stick mouse movement, trigger clicks, right-stick arrow-key repeat, and DualSense touchpad mouse control.
+- Continuous per-frame stick output for both Xbox and DualSense, avoiding choppy held movement caused by HID jitter thresholds.
+- A read-only Settings check for the Windows default recording endpoint and whether a DualSense microphone endpoint is actually exposed.
+- Optional Codex Hook status bridging to the DualSense lightbar: blue for working, amber for attention, and green for completion.
 - Codex-foreground guard by default, plus pause and non-injecting input-test modes.
 - Local JSON settings, system tray behavior, device reconnect, and optional start with Windows.
 
@@ -149,20 +172,35 @@ VibeController is an open-source Windows desktop utility that turns input from a
 
 Requirements: Windows 10 22H2 or Windows 11, x64. The release is self-contained and does not require a separate .NET runtime, but it still requires [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/), which is normally present on Windows 11.
 
-1. Download `VibeController-v1.0.0-win-x64.zip` and its `.sha256` file from [Releases](https://github.com/Mrjie7205/VibeController/releases/latest).
-2. Optionally verify it with `Get-FileHash .\VibeController-v1.0.0-win-x64.zip -Algorithm SHA256`.
+1. Download `VibeController-v1.1.0-win-x64.zip` and its `.sha256` file from [Releases](https://github.com/Mrjie7205/VibeController/releases/latest).
+2. Optionally verify it with `Get-FileHash .\VibeController-v1.1.0-win-x64.zip -Algorithm SHA256`.
 3. Extract the complete archive; do not run the app from inside the ZIP.
 4. Pair or connect the controller through Bluetooth, USB, or Xbox Wireless Adapter.
 5. Run `VibeController.App.exe`, choose Xbox or PS5 in Settings, and confirm inputs in Test Input mode.
 6. Start Codex. Use Menu / Options to focus it, exit Test Input mode, and use the mappings.
 
-The v1.0.0 binaries are currently unsigned, so Windows SmartScreen may warn. Download only from this repository's Release page and verify the SHA-256 checksum.
+The v1.1.0 binaries are currently unsigned, so Windows SmartScreen may warn. Download only from this repository's Release page and verify the SHA-256 checksum.
 
 ### Codex shortcut synchronization
 
 For a Codex action, VibeController reads the shortcut on first use from `$CODEX_HOME\keybindings.json`, or `%USERPROFILE%\.codex\keybindings.json` when `CODEX_HOME` is unset. Custom Codex bindings override defaults and the file is reloaded after it changes.
 
 If an action is explicitly unbound, has no Codex default, or uses an unsupported accelerator format, VibeController reports the problem instead of injecting a stale fallback. Codex commonly has no default binding for **Toggle Dictation** or **Increase/Decrease Reasoning Effort**; bind those actions once under **Codex → Settings → Keyboard Shortcuts**. Each user may choose different combinations.
+
+### Dictation microphone and DualSense status light
+
+The “Dictation & status light” card in Settings reports the current Windows default recording endpoint and checks active endpoints for a DualSense / Wireless Controller microphone. This is metadata-only detection: VibeController does not open or record from the microphone. Codex native dictation still performs all speech recognition. A standard Bluetooth controller connection normally does not expose the DualSense microphone to Windows, so use the computer microphone or a wired mode that exposes the audio endpoint.
+
+“Use the DualSense lightbar for Codex status” is off by default. When explicitly enabled and saved, VibeController merges its command handlers into `$CODEX_HOME\hooks.json`, falling back to `%USERPROFILE%\.codex\hooks.json` when `CODEX_HOME` is unset, and preserves an existing file once as `hooks.json.vibecontroller.bak`.
+
+| Lightbar | Codex state |
+| --- | --- |
+| Blue | Working |
+| Amber | Waiting for permission or user action |
+| Green for 8 seconds | Turn completed |
+| Dim blue | Idle |
+
+Codex may ask you to trust a non-managed Hook the first time it runs. Turning the option off removes only VibeController's handlers. The bridge state stores only session ID, working directory, state, and timestamp—never prompts, responses, or tool input/output.
 
 ### Default mappings
 
@@ -188,7 +226,7 @@ Previous/next recently viewed thread and previous/next tab are also available in
 
 VibeController normalizes XInput/HID reports, applies the editable mapping, resolves Codex shortcuts, checks the foreground-window policy, and injects ordinary Windows keyboard/mouse input. It does not use a private Codex API.
 
-Settings stay in `%LOCALAPPDATA%\VibeController\settings.json`. VibeController does not request microphone access, record audio, or read/store Codex conversation text. The default foreground guard prevents accidental input into other apps; global mode is available but should be used deliberately.
+Settings stay in `%LOCALAPPDATA%\VibeController\settings.json`. VibeController only enumerates recording-endpoint names; it does not open the microphone, record audio, or read/store Codex conversation text. It installs the Codex Hook only after the user explicitly enables the status-light option. The default foreground guard prevents accidental input into other apps; global mode is available but should be used deliberately.
 
 ### Build from source
 
@@ -205,8 +243,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\build.ps1
 The self-contained publish output is written to `artifacts\win-x64`. To create the distributable ZIP and checksum:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -Version 1.0.0
-powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-release.ps1 -Version 1.0.0
+powershell -ExecutionPolicy Bypass -File .\scripts\package-release.ps1 -Version 1.1.0
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-release.ps1 -Version 1.1.0
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture and pull-request guidance, and the [hardware checklist](docs/testing/hardware-checklist.md) for physical-device validation.
@@ -216,6 +254,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture and pull-request guidanc
 - Windows x64 only; no installer, automatic updater, or code-signing certificate yet.
 - Xbox uses XInput, so OS-reserved buttons such as Guide are not core inputs.
 - DualSense USB/Bluetooth parsing and touchpad behavior are covered by automated tests, while more real-world firmware and adapter reports are welcome.
+- DualSense USB/Bluetooth lightbar packets and Bluetooth CRC are covered by automated tests, but firmware, Bluetooth stacks, and shared HID write access still require physical-device acceptance.
+- Standard DualSense Bluetooth pairing normally exposes controller HID only, not its microphone audio endpoint; VibeController does not bypass Windows audio-device capabilities.
 - Planned directions include TCL remotes, profiles, chord/hold actions, and additional generic HID devices.
 
 ### License and notice

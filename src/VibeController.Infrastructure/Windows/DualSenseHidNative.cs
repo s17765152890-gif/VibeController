@@ -5,15 +5,23 @@ namespace VibeController.Infrastructure.Windows;
 
 internal sealed class DualSenseHidDevice : IDisposable
 {
-    public DualSenseHidDevice(FileStream stream, int inputReportLength)
+    public DualSenseHidDevice(
+        FileStream stream,
+        int inputReportLength,
+        int outputReportLength)
     {
         Stream = stream;
         InputReportLength = inputReportLength;
+        OutputReportLength = outputReportLength;
     }
 
     public FileStream Stream { get; }
 
     public int InputReportLength { get; }
+
+    public int OutputReportLength { get; }
+
+    public bool CanWrite => Stream.CanWrite && OutputReportLength > 0;
 
     public void Dispose() => Stream.Dispose();
 }
@@ -106,7 +114,10 @@ internal static class DualSenseHidNative
                 fileAccess,
                 caps.InputReportByteLength,
                 isAsync: true);
-            return new DualSenseHidDevice(stream, caps.InputReportByteLength);
+            return new DualSenseHidDevice(
+                stream,
+                caps.InputReportByteLength,
+                caps.OutputReportByteLength);
         }
         catch
         {

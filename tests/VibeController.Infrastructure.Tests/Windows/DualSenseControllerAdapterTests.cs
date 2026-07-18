@@ -70,6 +70,18 @@ public sealed class DualSenseControllerAdapterTests
         Assert.True(api.Disposed);
     }
 
+    [Fact]
+    public void SetLightbarColor_ForwardsTheDesiredColorToTheHidApi()
+    {
+        var api = new FakeDualSenseHidApi((HidItem?)null);
+        using var adapter = new DualSenseControllerAdapter(api);
+        var color = new ControllerLightbarColor(10, 132, 255);
+
+        ((IControllerLightbar)adapter).SetLightbarColor(color);
+
+        Assert.Equal(color, api.LightbarColor);
+    }
+
     private static HidItem Item(int index, uint packet, byte[] report) =>
         new(index, packet, report);
 
@@ -111,6 +123,8 @@ public sealed class DualSenseControllerAdapterTests
 
         public bool Disposed { get; private set; }
 
+        public ControllerLightbarColor? LightbarColor { get; private set; }
+
         public bool TryGetLatestReport(
             int controllerIndex,
             out uint packetNumber,
@@ -128,6 +142,9 @@ public sealed class DualSenseControllerAdapterTests
             report = item.Report;
             return true;
         }
+
+        public void SetLightbarColor(ControllerLightbarColor color) =>
+            LightbarColor = color;
 
         public void Dispose() => Disposed = true;
     }

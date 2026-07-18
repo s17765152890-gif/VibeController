@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using VibeController.Core.Domain;
+using VibeController.Infrastructure.Codex;
 
 namespace VibeController.Infrastructure.Windows;
 
@@ -24,15 +25,7 @@ public sealed class CodexShortcutResolver : ICodexShortcutResolver
     }
 
     public static string GetDefaultKeybindingsPath()
-    {
-        var configuredCodexHome = Environment.GetEnvironmentVariable("CODEX_HOME");
-        var codexHome = string.IsNullOrWhiteSpace(configuredCodexHome)
-            ? Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
-                ".codex")
-            : configuredCodexHome;
-        return Path.Combine(codexHome, "keybindings.json");
-    }
+        => Path.Combine(CodexHomeLocator.GetCurrent(), "keybindings.json");
 
     public KeyboardShortcut Resolve(MappedActionKind actionKind)
     {

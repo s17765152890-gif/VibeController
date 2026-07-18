@@ -14,6 +14,9 @@ public sealed class DualSenseHidApi : IDualSenseHidApi
     private byte[]? _latestReport;
     private uint _packetNumber;
     private long _latestReportAt;
+    private ControllerLightbarColor? _desiredLightbarColor;
+    private long _desiredLightbarVersion;
+    private byte _outputSequence;
     private bool _disposed;
 
     public bool TryGetLatestReport(
@@ -42,6 +45,21 @@ public sealed class DualSenseHidApi : IDualSenseHidApi
             packetNumber = _packetNumber;
             report = _latestReport!;
             return true;
+        }
+    }
+
+    public void SetLightbarColor(ControllerLightbarColor color)
+    {
+        lock (_gate)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (_desiredLightbarColor == color)
+            {
+                return;
+            }
+
+            _desiredLightbarColor = color;
+            _desiredLightbarVersion = unchecked(_desiredLightbarVersion + 1);
         }
     }
 
@@ -116,12 +134,24 @@ public sealed class DualSenseHidApi : IDualSenseHidApi
                     continue;
                 }
 
+                var lightbarState = new LightbarWriteState(
+                    SetupSent: false,
+                    SentVersion: -1,
+                    OutputAvailable: device.CanWrite);
+
                 while (!cancellationToken.IsCancellationRequested)
                 {
                     var report = await ReadReportAsync(device, cancellationToken);
                     if (DualSenseReportParser.TryParse(report, out _))
                     {
                         Publish(controllerIndex, report);
+                        lightbarState = await WritePendingLightbarAsync(
+                            device,
+                            report[0] == 0x31
+                                ? DualSenseTransport.Bluetooth
+                                : DualSenseTransport.Usb,
+                            lightbarState,
+                            cancellationToken);
                     }
                 }
             }
@@ -182,6 +212,73 @@ public sealed class DualSenseHidApi : IDualSenseHidApi
         }
     }
 
+    private async Task<LightbarWriteState> WritePendingLightbarAsync(
+        DualSenseHidDevice device,
+        DualSenseTransport transport,
+        LightbarWriteState state,
+        CancellationToken cancellationToken)
+    {
+        if (!state.OutputAvailable ||
+            !TryGetDesiredLightbar(out var color, out var version))
+        {
+            return state;
+        }
+
+        try
+        {
+            byte[] outputReport;
+            if (!state.SetupSent)
+            {
+                outputReport = DualSenseOutputReportBuilder.BuildLightbarSetup(
+                    transport,
+                    device.OutputReportLength,
+                    _outputSequence++);
+                await device.Stream.WriteAsync(outputReport, cancellationToken);
+                return state with { SetupSent = true };
+            }
+
+            if (state.SentVersion == version)
+            {
+                return state;
+            }
+
+            outputReport = DualSenseOutputReportBuilder.BuildLightbarColor(
+                transport,
+                device.OutputReportLength,
+                _outputSequence++,
+                color);
+            await device.Stream.WriteAsync(outputReport, cancellationToken);
+            return state with { SentVersion = version };
+        }
+        catch (Exception exception) when (exception is
+            IOException or
+            NotSupportedException or
+            UnauthorizedAccessException or
+            ArgumentOutOfRangeException)
+        {
+            return state with { OutputAvailable = false };
+        }
+    }
+
+    private bool TryGetDesiredLightbar(
+        out ControllerLightbarColor color,
+        out long version)
+    {
+        lock (_gate)
+        {
+            if (_desiredLightbarColor is not { } desired)
+            {
+                color = default;
+                version = 0;
+                return false;
+            }
+
+            color = desired;
+            version = _desiredLightbarVersion;
+            return true;
+        }
+    }
+
     private void SetDisconnected(int controllerIndex)
     {
         lock (_gate)
@@ -195,4 +292,9 @@ public sealed class DualSenseHidApi : IDualSenseHidApi
             _latestReportAt = 0;
         }
     }
+
+    private sealed record LightbarWriteState(
+        bool SetupSent,
+        long SentVersion,
+        bool OutputAvailable);
 }
