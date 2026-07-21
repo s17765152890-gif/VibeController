@@ -106,6 +106,26 @@ The live preview on 2026-07-22 found the exact RC901A device and returned `Mode=
 
 The current signing gate is therefore closed. The elevated read-only audit on 2026-07-22 confirmed that Secure Boot is enabled, the system volume is fully decrypted with BitLocker protection off, `testsigning`, `nointegritychecks`, and kernel debugging are not configured in the current BCD entry, the hypervisor starts automatically, and virtualization-based security plus kernel code-integrity enforcement are active. Do not create trust certificates, enable `TESTSIGNING`, disable Secure Boot, or install the package without explicit user approval and a reboot/rollback plan.
 
+## Temporary test-mode workflow
+
+This workflow is for one controlled hardware capture on the development machine. It is not a release or end-user installation path.
+
+```powershell
+# Preview, then prepare an isolated signed package under ignored artifacts.
+.\scripts\rc901a\New-Rc901aTestSignedPackage.ps1
+.\scripts\rc901a\New-Rc901aTestSignedPackage.ps1 -Apply
+
+# After manually disabling only Secure Boot in UEFI, run elevated:
+.\scripts\rc901a\Enter-Rc901aTestMode.ps1
+.\scripts\rc901a\Enter-Rc901aTestMode.ps1 -Apply
+
+# After capture-filter uninstall, run elevated:
+.\scripts\rc901a\Restore-Rc901aTestMode.ps1
+.\scripts\rc901a\Restore-Rc901aTestMode.ps1 -Apply
+```
+
+Preparation creates a seven-day, non-exportable certificate in `Cert:\CurrentUser\My`, signs the SYS, regenerates the catalog from the signed SYS, signs the catalog, and records the exact certificate thumbprint in an ignored session JSON. Entry refuses to run while Secure Boot is enabled, trusts only that recorded certificate in Local Machine Root and Trusted Publishers, and changes only `{current}` `TESTSIGNING`. Restore refuses to run while the RC901A driver package remains installed, restores the recorded original `TESTSIGNING` state, and removes only the recorded certificate from the two machine stores plus Current User Personal. The operator must then restart and re-enable Secure Boot in UEFI. Never clear or replace Secure Boot PK/KEK/db keys for this workflow.
+
 ## Rollback outline
 
 Before first installation, the install script records the service instance state shown by the read-only script. The rollback script removes only the validated RC901A OEM filter package and verifies that Windows returned to the previously recorded Microsoft driver selection. It does not delete the Bluetooth pairing, remove class-wide filters, or touch Xbox/DualSense devices.
