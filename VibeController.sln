@@ -17,6 +17,12 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VibeController.Core.Tests",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VibeController.Infrastructure.Tests", "tests\VibeController.Infrastructure.Tests\VibeController.Infrastructure.Tests.csproj", "{4729B3D9-02A1-4163-B01E-A0F5D188D0D4}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{835DEC00-BBF7-4970-9120-2B605FA98929}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VibeController.Rc901aDescriptorTool", "tools\VibeController.Rc901aDescriptorTool\VibeController.Rc901aDescriptorTool.csproj", "{2D6AC499-5CC1-4A41-A895-203B9A4205C8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VibeController.Rc901aDescriptorTool.Tests", "tests\VibeController.Rc901aDescriptorTool.Tests\VibeController.Rc901aDescriptorTool.Tests.csproj", "{681B7DE6-84F1-4ACF-AD18-705069869F5D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -46,6 +52,14 @@ Global
 		{4729B3D9-02A1-4163-B01E-A0F5D188D0D4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4729B3D9-02A1-4163-B01E-A0F5D188D0D4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4729B3D9-02A1-4163-B01E-A0F5D188D0D4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2D6AC499-5CC1-4A41-A895-203B9A4205C8}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2D6AC499-5CC1-4A41-A895-203B9A4205C8}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2D6AC499-5CC1-4A41-A895-203B9A4205C8}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2D6AC499-5CC1-4A41-A895-203B9A4205C8}.Release|Any CPU.Build.0 = Release|Any CPU
+		{681B7DE6-84F1-4ACF-AD18-705069869F5D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{681B7DE6-84F1-4ACF-AD18-705069869F5D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{681B7DE6-84F1-4ACF-AD18-705069869F5D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{681B7DE6-84F1-4ACF-AD18-705069869F5D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{B9ADB4C2-E913-4906-BE60-DFE4A616ABC1} = {8AA760FE-D8F0-47C1-994A-FDF3AFF3C6B5}
@@ -53,5 +67,7 @@ Global
 		{1EDABA1B-AC17-42FF-9A1E-70A735F679A6} = {8AA760FE-D8F0-47C1-994A-FDF3AFF3C6B5}
 		{93125B79-8404-40A9-949C-CF6D115F3C36} = {39F8B79F-28F6-49B1-BFFE-735AFBF3FABF}
 		{4729B3D9-02A1-4163-B01E-A0F5D188D0D4} = {39F8B79F-28F6-49B1-BFFE-735AFBF3FABF}
+		{2D6AC499-5CC1-4A41-A895-203B9A4205C8} = {835DEC00-BBF7-4970-9120-2B605FA98929}
+		{681B7DE6-84F1-4ACF-AD18-705069869F5D} = {39F8B79F-28F6-49B1-BFFE-735AFBF3FABF}
 	EndGlobalSection
 EndGlobal

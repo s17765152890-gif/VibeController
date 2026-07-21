@@ -124,26 +124,30 @@ git commit -m "feat: analyze HID report descriptors"
 - Test: `tests/VibeController.Core.Tests/Devices/HidDescriptorPatchTests.cs`
 - Create: `tools/VibeController.Rc901aDescriptorTool/VibeController.Rc901aDescriptorTool.csproj`
 - Create: `tools/VibeController.Rc901aDescriptorTool/Program.cs`
+- Create: `tools/VibeController.Rc901aDescriptorTool/Rc901aDescriptorToolApplication.cs`
+- Create: `tests/VibeController.Rc901aDescriptorTool.Tests/VibeController.Rc901aDescriptorTool.Tests.csproj`
+- Create: `tests/VibeController.Rc901aDescriptorTool.Tests/Rc901aDescriptorToolApplicationTests.cs`
+- Modify: `VibeController.sln`
 
-- [ ] **Step 1: Write failing patch-safety tests**
+- [x] **Step 1: Write failing patch-safety tests**
 
 Verify a patch applies only if all conditions match: full descriptor length, SHA-256, byte offset, and expected original bytes. Verify wrong hash, wrong length, out-of-range offset, and already-modified bytes return an unchanged copy plus a refusal reason.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 ```powershell
 .\.tools\dotnet\dotnet.exe test tests\VibeController.Core.Tests --filter FullyQualifiedName~HidDescriptorPatchTests
 ```
 
-- [ ] **Step 3: Implement immutable exact patching**
+- [x] **Step 3: Implement immutable exact patching**
 
 The implementation returns a new byte array and never edits caller-owned memory. The initial `Rc901aDescriptorPatchManifest` has no active patch because the real report map has not yet been captured.
 
-- [ ] **Step 4: Write the CLI acceptance test, then implement the CLI**
+- [x] **Step 4: Write the CLI acceptance test, then implement the CLI**
 
 Given a binary descriptor path, the CLI prints length, uppercase hex, SHA-256, parsed items, and diagnostics. `--apply-rc901a-patch` must refuse while the manifest is inactive. It must never access Bluetooth or write the registry.
 
-- [ ] **Step 5: Run GREEN and commit**
+- [x] **Step 5: Run GREEN and commit**
 
 ```powershell
 .\.tools\dotnet\dotnet.exe test tests\VibeController.Core.Tests
