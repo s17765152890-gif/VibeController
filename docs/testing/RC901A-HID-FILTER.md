@@ -106,7 +106,7 @@ The live preview on 2026-07-22 found the exact RC901A device and returned `Mode=
 
 The current signing gate is therefore closed. The elevated read-only audit on 2026-07-22 confirmed that Secure Boot is enabled, the system volume is fully decrypted with BitLocker protection off, `testsigning`, `nointegritychecks`, and kernel debugging are not configured in the current BCD entry, the hypervisor starts automatically, and virtualization-based security plus kernel code-integrity enforcement are active. Do not create trust certificates, enable `TESTSIGNING`, disable Secure Boot, or install the package without explicit user approval and a reboot/rollback plan.
 
-## Temporary test-mode workflow
+## Preferred one-boot capture workflow
 
 This workflow is for one controlled hardware capture on the development machine. It is not a release or end-user installation path.
 
@@ -115,16 +115,26 @@ This workflow is for one controlled hardware capture on the development machine.
 .\scripts\rc901a\New-Rc901aTestSignedPackage.ps1
 .\scripts\rc901a\New-Rc901aTestSignedPackage.ps1 -Apply
 
-# After manually disabling only Secure Boot in UEFI, run elevated:
-.\scripts\rc901a\Enter-Rc901aTestMode.ps1
-.\scripts\rc901a\Enter-Rc901aTestMode.ps1 -Apply
+# Trust only the exact temporary certificate recorded by that package.
+# This launcher requests elevation but changes no boot or driver setting.
+.\scripts\rc901a\Start-Rc901aOneBootTrust.ps1
+
+# Then use Windows Settings > System > Recovery > Advanced startup.
+# In Startup Settings choose 7/F7: Disable Driver Signature Enforcement.
+# The relaxation applies only to the next Windows session.
 
 # After capture-filter uninstall, run elevated:
 .\scripts\rc901a\Restore-Rc901aTestMode.ps1
 .\scripts\rc901a\Restore-Rc901aTestMode.ps1 -Apply
 ```
 
-Preparation creates a seven-day, non-exportable certificate in `Cert:\CurrentUser\My`, signs the SYS, regenerates the catalog from the signed SYS, signs the catalog, and records the exact certificate thumbprint in an ignored session JSON. Entry refuses to run while Secure Boot is enabled, trusts only that recorded certificate in Local Machine Root and Trusted Publishers, and changes only `{current}` `TESTSIGNING`. Restore refuses to run while the RC901A driver package remains installed, restores the recorded original `TESTSIGNING` state, and removes only the recorded certificate from the two machine stores plus Current User Personal. The operator must then restart and re-enable Secure Boot in UEFI. Never clear or replace Secure Boot PK/KEK/db keys for this workflow.
+Preparation creates a seven-day, non-exportable certificate in `Cert:\CurrentUser\My`, signs the SYS, regenerates the catalog from the signed SYS, signs the catalog, and records the exact certificate thumbprint in an ignored session JSON. The one-boot trust script imports only that recorded public certificate into Local Machine Root and Trusted Publishers, verifies both signatures, and does not change BCD, Secure Boot, PnP state, or restart state. The operator then enters Windows Startup Settings and selects option 7/F7. Secure Boot stays enabled, and normal signature enforcement returns after the following ordinary reboot.
+
+Restore refuses to run while the RC901A driver package remains installed and removes only the recorded certificate from the two machine stores plus Current User Personal. The capture driver must be uninstalled and certificate trust removed before the final ordinary reboot.
+
+## Persistent test-mode fallback
+
+`Enter-Rc901aTestMode.ps1` remains available only as an explicitly approved fallback if the one-boot route is rejected by this machine. It requires disabling Secure Boot in UEFI and changes `{current}` `TESTSIGNING`; do not use it for the current capture attempt. Never clear or replace Secure Boot PK/KEK/db keys for either workflow.
 
 ## Rollback outline
 

@@ -1,12 +1,81 @@
 $prepareScript = Join-Path $PSScriptRoot '..\..\scripts\rc901a\New-Rc901aTestSignedPackage.ps1'
 $enterScript = Join-Path $PSScriptRoot '..\..\scripts\rc901a\Enter-Rc901aTestMode.ps1'
 $restoreScript = Join-Path $PSScriptRoot '..\..\scripts\rc901a\Restore-Rc901aTestMode.ps1'
+$oneBootTrustScript = Join-Path $PSScriptRoot '..\..\scripts\rc901a\Trust-Rc901aOneBootCertificate.ps1'
+$oneBootTrustLauncher = Join-Path $PSScriptRoot '..\..\scripts\rc901a\Start-Rc901aOneBootTrust.ps1'
 
 Describe 'RC901A temporary test-mode workflow scripts' {
     It 'provides preparation, entry, and restore scripts' {
         Test-Path -LiteralPath $prepareScript | Should Be $true
         Test-Path -LiteralPath $enterScript | Should Be $true
         Test-Path -LiteralPath $restoreScript | Should Be $true
+    }
+
+    It 'provides the safer one-boot certificate trust script' {
+        Test-Path -LiteralPath $oneBootTrustScript | Should Be $true
+    }
+
+    It 'provides an elevation launcher for one-boot trust only' {
+        Test-Path -LiteralPath $oneBootTrustLauncher | Should Be $true
+    }
+}
+
+if (Test-Path -LiteralPath $oneBootTrustScript) {
+    . $oneBootTrustScript -FunctionsOnly
+
+    Describe 'New-Rc901aOneBootTrustPlan' {
+        It 'trusts only the recorded certificate and changes no boot policy' {
+            $plan = New-Rc901aOneBootTrustPlan -SessionPath 'C:\session.json'
+
+            $plan.Mode | Should Be 'WhatIf'
+            $plan.WillMutate | Should Be $false
+            $plan.TrustStores | Should Be @('Root', 'TrustedPublisher')
+            $plan.BcdAction | Should Be 'None'
+            $plan.SecureBootAction | Should Be 'None'
+            $plan.DriverAction | Should Be 'None'
+            $plan.RestoreScript | Should Match 'Restore-Rc901aTestMode\.ps1'
+        }
+    }
+
+    Describe 'RC901A one-boot trust mutation boundary' {
+        It 'never changes BCD, Secure Boot, PnP, or restart state' {
+            $content = Get-Content -LiteralPath $oneBootTrustScript -Raw
+
+            $content | Should Not Match '(?i)\bbcdedit(?:\.exe)?\b'
+            $content | Should Not Match '(?i)Confirm-SecureBootUEFI'
+            $content | Should Not Match '(?i)\bpnputil(?:\.exe)?\b'
+            $content | Should Not Match '(?i)\b(shutdown|Restart-Computer)\b'
+        }
+
+        It 'computes its default session path after startup' {
+            $content = Get-Content -LiteralPath $oneBootTrustScript -Raw
+            $content | Should Not Match '=\s*\(Join-Path\s+\$PSScriptRoot'
+            $content | Should Match 'IsNullOrWhiteSpace\(\$SessionPath\)'
+        }
+    }
+}
+
+if (Test-Path -LiteralPath $oneBootTrustLauncher) {
+    Describe 'RC901A one-boot trust elevation launcher' {
+        $launcherContent = Get-Content -LiteralPath $oneBootTrustLauncher -Raw
+
+        It 'elevates the exact trust script and requests Apply' {
+            $launcherContent | Should Match 'Trust-Rc901aOneBootCertificate\.ps1'
+            $launcherContent | Should Match '-EncodedCommand'
+            $launcherContent | Should Match '-Verb\s+RunAs'
+            $launcherContent | Should Match '-Apply'
+        }
+
+        It 'never changes boot, PnP, or restart state itself' {
+            $launcherContent | Should Not Match '(?i)\bbcdedit(?:\.exe)?\b'
+            $launcherContent | Should Not Match '(?i)\bpnputil(?:\.exe)?\b'
+            $launcherContent | Should Not Match '(?i)\b(shutdown|Restart-Computer)\b'
+        }
+
+        It 'computes its default session path after startup' {
+            $launcherContent | Should Not Match '=\s*\(Join-Path\s+\$PSScriptRoot'
+            $launcherContent | Should Match 'IsNullOrWhiteSpace\(\$SessionPath\)'
+        }
     }
 }
 

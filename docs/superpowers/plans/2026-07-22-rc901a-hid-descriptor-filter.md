@@ -242,9 +242,11 @@ Tests verify both scripts default to `-WhatIf`, refuse any non-exact hardware ID
 
 Installation requires an explicit `-Apply` switch and an exact instance-ID recheck immediately before each mutation. Uninstall removes only the RC901A filter package and restores the previously recorded driver selection.
 
-- [ ] **Step 3: Stop at the signing/boot-policy gate**
+- [x] **Step 3: Stop at the signing/boot-policy gate**
 
 Present the built package, dry-run output, and rollback procedure to the user. Obtain explicit approval before enabling test-signing or changing any boot setting. Prefer a normally trusted development certificate path if the machine permits it.
+
+The user selected the Windows one-boot Startup Settings route. The implementation trusts only the recorded temporary certificate and leaves Secure Boot plus BCD unchanged. The user must manually choose option 7/F7, and the relaxed signature-enforcement state ends at the following ordinary reboot.
 
 - [ ] **Step 4: Capture the real descriptor**
 
