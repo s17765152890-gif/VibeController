@@ -2,8 +2,8 @@
 
 <div align="center">
 
-**把 Xbox / PS5 手柄变成 Codex 的轻量遥控器。**<br>
-**Turn an Xbox or PS5 controller into a lightweight remote for Codex.**
+**把 Xbox / PS5 手柄和 TCL 遥控器变成 Codex 的轻量控制器。**<br>
+**Turn Xbox / PS5 controllers and a TCL remote into lightweight controls for Codex.**
 
 [![CI](https://github.com/Mrjie7205/VibeController/actions/workflows/ci.yml/badge.svg)](https://github.com/Mrjie7205/VibeController/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/Mrjie7205/VibeController)](https://github.com/Mrjie7205/VibeController/releases/latest)
@@ -19,11 +19,12 @@
 
 ## 简体中文
 
-VibeController 是一款面向 Windows 的开源桌面工具。它读取 Xbox Series X|S 或 PS5 DualSense 手柄输入，再将按键、摇杆和触控板转换为 Codex 操作、键盘快捷键或鼠标事件。它不会接管语音识别：听写仍由 Codex 桌面端和电脑麦克风完成。
+VibeController 是一款面向 Windows 的开源桌面工具。它读取 Xbox Series X|S、PS5 DualSense 或 TCL BT_RC901A_B1 的输入，再将按键、摇杆和触控板转换为 Codex 操作、键盘快捷键或鼠标事件。它不会接管语音识别：听写仍由 Codex 桌面端和电脑麦克风完成。
 
 ### 功能亮点
 
 - 支持 Xbox Wireless Controller（XInput，控制器 1–4）和 PS5 DualSense（USB / 蓝牙 HID）。
+- 实验性支持 TCL BT_RC901A_B1：即使 Windows 的通用 HID 子驱动报错，也可通过专用 BLE GATT 后端读取连接状态、电量和原始通知。
 - Codex 语义动作不是写死的快捷键：首次触发时读取 Codex 当前快捷键，并在配置变化后自动刷新。
 - 支持听写、发送、命令菜单、任务/最近任务/标签页切换和推理强度调节。
 - 左摇杆移动鼠标，扳机键点击；DualSense 触控板移动鼠标，按下执行左键单击。
@@ -33,6 +34,16 @@ VibeController 是一款面向 Windows 的开源桌面工具。它读取 Xbox Se
 - 可选的 Codex Hook 状态桥接：DualSense 灯条用蓝色、琥珀色和绿色表示工作中、等待操作和已完成。
 - 默认只在 Codex 位于前台时注入输入，另有暂停映射和无注入测试模式。
 - 本地 JSON 配置、系统托盘、自动重连和开机启动选项。
+
+### TCL RC901A 实验性直连
+
+当前源码包含 BT_RC901A_B1 的专用 BLE 后端、设备切换界面、遥控器示意图、默认动作配置和原始数据检查器；已发布的 v1.1.0 二进制尚不包含该功能。RC901A 的逻辑按键解释器默认保持空白，必须先从实体遥控器采集并验证每个按键的真实数据包，项目不会猜测厂商协议。
+
+Windows 可能为该遥控器显示“驱动程序错误”。已确认这是 Windows 通用 BLE HID 驱动无法解析遥控器固件中的 HID 报告描述符，不代表整个蓝牙设备不可用。VibeController 会绕过失败的 HID 子驱动，直接检查标准 HID 服务和 TCL 的 D0FF/D1FF GATT 通知服务。
+
+如果 Windows 显示“已配对”但 VibeController 报告 `Unreachable`，通常是电脑与遥控器保存的绑定密钥不同步：先在 Windows 蓝牙设置中删除 `BT_RC901A_B1`，再靠近电脑同时长按 `Home + OK` 约 5 秒并重新配对。完整步骤和安全采集规则见 [RC901A BLE 采集指南](docs/testing/RC901A-BLE-CAPTURE.md)。
+
+该后端不会写入 TCL 厂商特征或 DFU 服务；唯一允许的写操作是 BLE 标准要求的通知订阅描述符。Mic 键目前只能映射为 Codex 原生听写快捷键，遥控器麦克风音频尚未接入。
 
 | PS5 DualSense | 按键映射 |
 | --- | --- |
@@ -46,7 +57,7 @@ VibeController 是一款面向 Windows 的开源桌面工具。它读取 Xbox Se
 2. 可选但推荐：执行 `Get-FileHash .\VibeController-v1.1.0-win-x64.zip -Algorithm SHA256`，与校验文件比较。
 3. 完整解压 ZIP，不要直接在压缩包内运行。
 4. 在 Windows 中通过蓝牙、USB 或 Xbox Wireless Adapter 连接手柄。
-5. 运行 `VibeController.App.exe`，在“设置”中选择 Xbox 或 PS5，再用“测试输入”确认按键。
+5. 运行 `VibeController.App.exe`，在“设置”中选择 Xbox 或 PS5，再用“测试输入”确认按键。TCL RC901A 当前需从源码构建实验分支。
 6. 启动 Codex；按 Menu / Options 激活窗口，退出测试模式后即可执行映射。
 
 当前二进制尚未进行代码签名，因此 Windows SmartScreen 可能显示警告。请只从本仓库 Release 下载并核对 SHA-256。
@@ -100,7 +111,7 @@ Codex 当前通常未给“切换听写”和“提高/降低推理强度”分�
 ### 工作原理
 
 ```text
-Xbox XInput / DualSense HID
+Xbox XInput / DualSense HID / RC901A Direct BLE
           ↓
 统一的手柄输入事件
           ↓
@@ -141,7 +152,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-release.ps1 -Versi
 - DualSense 的 USB/蓝牙报告解析和触控板行为已有自动化测试，但不同固件与蓝牙适配器仍需要更多实体设备反馈。
 - DualSense 灯条的 USB/蓝牙输出报告与 CRC 已有自动化测试；不同固件、蓝牙栈以及共享 HID 写权限仍需按硬件清单验收。
 - 普通 DualSense 蓝牙配对通常只提供手柄 HID，不提供麦克风音频端点；VibeController 不尝试绕过 Windows 的音频设备能力。
-- 未来计划包括 TCL 遥控器、配置档案、组合/长按动作以及更多通用 HID 设备。
+- RC901A 直连仍处于实体数据包采集阶段；在签名完成前，界面可以显示连接和原始通知，但不会猜测按键动作。
+- 未来计划包括配置档案、组合/长按动作以及更多通用 HID 设备。
 
 ### 许可证与声明
 
@@ -153,12 +165,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-release.ps1 -Versi
 
 ## English
 
-VibeController is an open-source Windows desktop utility that turns input from an Xbox Series X|S controller or PS5 DualSense into Codex actions, keyboard shortcuts, and mouse events. It does not perform speech recognition itself: dictation remains entirely inside the Codex desktop app and uses your computer's microphone.
+VibeController is an open-source Windows desktop utility that turns input from Xbox Series X|S, PS5 DualSense, or TCL BT_RC901A_B1 into Codex actions, keyboard shortcuts, and mouse events. It does not perform speech recognition itself: dictation remains entirely inside the Codex desktop app and uses your computer's microphone.
 
 ### Highlights
 
 - Xbox Wireless Controller support through XInput (controller slots 1–4).
 - PS5 DualSense support through native Windows USB/Bluetooth HID, including the touchpad.
+- Experimental TCL BT_RC901A_B1 support through a dedicated BLE GATT backend, independent of the failed generic Windows HID child driver.
 - Codex semantic actions resolve the user's current Codex shortcuts on first use and refresh after the file changes—no universal hard-coded shortcut assumptions.
 - Dictation, submit, command menu, thread/recent-thread/tab navigation, and reasoning-effort actions.
 - Left stick mouse movement, trigger clicks, right-stick arrow-key repeat, and DualSense touchpad mouse control.
@@ -168,6 +181,16 @@ VibeController is an open-source Windows desktop utility that turns input from a
 - Codex-foreground guard by default, plus pause and non-injecting input-test modes.
 - Local JSON settings, system tray behavior, device reconnect, and optional start with Windows.
 
+### Experimental TCL RC901A direct BLE
+
+The current source tree includes a dedicated BT_RC901A_B1 backend, device picker, remote visual, default action profile, and raw-notification inspector. The published v1.1.0 binaries do not include it yet. The logical report registry intentionally starts empty: physical button signatures must be captured and verified before the project assigns meanings to vendor packets.
+
+Windows may show “Driver error” for this remote. Hardware probing confirmed that the generic BLE HID child driver rejects the firmware's HID report descriptor; that does not make the complete BLE device unusable. VibeController bypasses that child driver and inspects the standard HID plus TCL D0FF/D1FF notification services directly.
+
+If Windows says the remote is paired while VibeController reports `Unreachable`, remove `BT_RC901A_B1` from Windows Bluetooth settings, hold `Home + OK` near the computer for about five seconds, and pair it again. This repairs stale bond keys. See the [RC901A BLE capture guide](docs/testing/RC901A-BLE-CAPTURE.md) for the full safe workflow.
+
+The backend never writes TCL vendor characteristics or the DFU service. Its only permitted write is the standard BLE notification-subscription descriptor. The Mic button can trigger Codex native dictation, but remote microphone audio is not supported yet.
+
 ### Download and install
 
 Requirements: Windows 10 22H2 or Windows 11, x64. The release is self-contained and does not require a separate .NET runtime, but it still requires [Microsoft Edge WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/), which is normally present on Windows 11.
@@ -176,7 +199,7 @@ Requirements: Windows 10 22H2 or Windows 11, x64. The release is self-contained 
 2. Optionally verify it with `Get-FileHash .\VibeController-v1.1.0-win-x64.zip -Algorithm SHA256`.
 3. Extract the complete archive; do not run the app from inside the ZIP.
 4. Pair or connect the controller through Bluetooth, USB, or Xbox Wireless Adapter.
-5. Run `VibeController.App.exe`, choose Xbox or PS5 in Settings, and confirm inputs in Test Input mode.
+5. Run `VibeController.App.exe`, choose Xbox or PS5 in Settings, and confirm inputs in Test Input mode. TCL RC901A currently requires a source build of the experimental branch.
 6. Start Codex. Use Menu / Options to focus it, exit Test Input mode, and use the mappings.
 
 The v1.1.0 binaries are currently unsigned, so Windows SmartScreen may warn. Download only from this repository's Release page and verify the SHA-256 checksum.
@@ -256,7 +279,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture and pull-request guidanc
 - DualSense USB/Bluetooth parsing and touchpad behavior are covered by automated tests, while more real-world firmware and adapter reports are welcome.
 - DualSense USB/Bluetooth lightbar packets and Bluetooth CRC are covered by automated tests, but firmware, Bluetooth stacks, and shared HID write access still require physical-device acceptance.
 - Standard DualSense Bluetooth pairing normally exposes controller HID only, not its microphone audio endpoint; VibeController does not bypass Windows audio-device capabilities.
-- Planned directions include TCL remotes, profiles, chord/hold actions, and additional generic HID devices.
+- RC901A direct BLE is still in physical packet-capture validation. Until signatures are verified, the UI can report connection and raw notifications but will not guess button actions.
+- Planned directions include profiles, chord/hold actions, and additional generic HID devices.
 
 ### License and notice
 
