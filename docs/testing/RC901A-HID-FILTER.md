@@ -62,8 +62,9 @@ Current test environment:
 - Portable .NET SDK is used from the repository tool directory.
 - Pester `3.4.0` is available system-wide.
 - Visual Studio Build Tools 2022 `17.14.36` is installed at `D:\Dev\VisualStudio\2022\BuildTools` with MSVC `14.44.35228.0`, MSBuild `17.14.51`, and Windows SDK `10.0.26100.0`.
-- The Build Tools installer completed successfully but requested a Windows restart; `PendingFileRenameOperations` is present. `vswhere` reports the installation complete and launchable.
-- WDK `10.1.26100.6584` is not installed yet. Its KMDF headers/libraries, `WindowsKernelModeDriver10.0` targets, and `InfVerif.exe` are therefore unavailable. WDK installation is intentionally paused until after the requested restart.
+- The Build Tools installation is complete and launchable. A generic `PendingFileRenameOperations` marker remains after the completed restart, but RC901A and Build Tools state are healthy.
+- WDK `10.1.26100.6584` is installed with KMDF through `1.35`, x64 libraries, Windows Driver MSBuild targets, and `InfVerif.exe`.
+- The separate Visual Studio component `Component.Microsoft.Windows.DriverKit.BuildTools` is not installed yet. A minimal KMDF project reproduces `MSB8020` for the missing `WindowsKernelModeDriver10.0` PlatformToolset. Visual Studio Installer is open with that component selected for an interactive Modify operation.
 
 ## Rollback outline
 
