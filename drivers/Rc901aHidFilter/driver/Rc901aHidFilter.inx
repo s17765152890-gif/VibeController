@@ -1,0 +1,72 @@
+[Version]
+Signature = "$WINDOWS NT$"
+Class = HIDClass
+ClassGuid = {745a17a0-74d3-11d0-b6fe-00a0c90f57da}
+Provider = %ProviderName%
+CatalogFile = Rc901aHidFilter.cat
+DriverVer = 07/22/2026,1.0.0.0
+PnpLockdown = 1
+
+[ControlFlags]
+ExcludeFromSelect = *
+
+[DestinationDirs]
+Rc901aHidFilter.CopyFiles = 13
+
+[SourceDisksNames]
+1 = %DiskName%,,,
+
+[SourceDisksFiles]
+Rc901aHidFilter.sys = 1
+
+[Rc901aHidFilter.CopyFiles]
+Rc901aHidFilter.sys
+
+[Manufacturer]
+%ProviderName% = Rc901aModels,NTamd64.10.0...19041
+
+[Rc901aModels.NTamd64.10.0...19041]
+%Rc901aDeviceDescription% = Rc901aHidFilter_Install, BTHLEDevice\{00001812-0000-1000-8000-00805f9b34fb}_Dev_VID&010416_PID&0301_REV&0003
+
+[Rc901aHidFilter_Install.NT]
+Include = hidbthle.inf
+Needs = HidBthLE.NT
+CopyFiles = Rc901aHidFilter.CopyFiles
+
+[Rc901aHidFilter_Install.NT.hw]
+Include = hidbthle.inf
+Needs = HidBthLE.NT.hw
+AddReg = Rc901aHidFilter.UpperFilter
+
+[Rc901aHidFilter.UpperFilter]
+HKR,,UpperFilters,0x00010008,"Rc901aHidFilter"
+
+[Rc901aHidFilter_Install.NT.Services]
+Include = hidbthle.inf
+Needs = HidBthLE.NT.Services
+AddService = Rc901aHidFilter,0x00000000,Rc901aHidFilter.Service
+
+[Rc901aHidFilter.Service]
+DisplayName = %Rc901aServiceDescription%
+ServiceType = 1
+StartType = 3
+ErrorControl = 1
+ServiceBinary = %13%\Rc901aHidFilter.sys
+
+[Rc901aHidFilter_Install.NT.Wdf]
+Include = hidbthle.inf
+Needs = HidBthLE.NT.Wdf
+KmdfService = Rc901aHidFilter,Rc901aHidFilter.Wdf
+
+[Rc901aHidFilter.Wdf]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Rc901aHidFilter_Install.NT.CoInstallers]
+Include = hidbthle.inf
+Needs = HidBthLE.NT.CoInstallers
+
+[Strings]
+ProviderName = "VibeController"
+DiskName = "VibeController RC901A capture filter"
+Rc901aDeviceDescription = "TCL RC901A HID capture filter"
+Rc901aServiceDescription = "VibeController RC901A HID descriptor capture filter"

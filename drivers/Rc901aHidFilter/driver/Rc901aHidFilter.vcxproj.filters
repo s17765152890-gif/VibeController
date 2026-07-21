@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files"><UniqueIdentifier>{595EA7BD-6E9B-443A-BE64-3F4EE9A66F8D}</UniqueIdentifier></Filter>
+    <Filter Include="Header Files"><UniqueIdentifier>{36647987-B31E-44F5-9ECE-E3714CF4179D}</UniqueIdentifier></Filter>
+    <Filter Include="Driver Files"><UniqueIdentifier>{EFBA18BF-0FC7-46D2-ACF0-B2B3ABEC87B1}</UniqueIdentifier></Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="DescriptorCapture.c"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="Device.c"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="Driver.c"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="Sha256.c"><Filter>Source Files</Filter></ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="DescriptorCapture.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="Device.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="Sha256.h"><Filter>Header Files</Filter></ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Inf Include="Rc901aHidFilter.inx"><Filter>Driver Files</Filter></Inf>
+  </ItemGroup>
+</Project>

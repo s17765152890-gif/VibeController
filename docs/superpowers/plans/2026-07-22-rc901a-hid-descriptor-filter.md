@@ -171,21 +171,21 @@ git commit -m "feat: add safe RC901A descriptor diagnostics"
 - Create: `drivers/Rc901aHidFilter/tests/DescriptorCaptureTests.vcxproj`
 - Create: `drivers/Rc901aHidFilter/tests/DescriptorCaptureTests.c`
 
-- [ ] **Step 1: Install or locate a supported driver build toolchain**
+- [x] **Step 1: Install or locate a supported driver build toolchain**
 
 Use Visual Studio Build Tools plus the Windows SDK and WDK whose versions are supported together. Do not install the driver or alter boot configuration. Record exact versions in `docs/testing/RC901A-HID-FILTER.md`.
 
-- [ ] **Step 2: Write failing native tests for bounded capture copying**
+- [x] **Step 2: Write failing native tests for bounded capture copying**
 
 Test zero length, maximum accepted descriptor length, oversized length, null source, and a normal descriptor. The portable capture helper copies into caller-owned storage and never allocates or touches kernel APIs.
 
-- [ ] **Step 3: Build native tests and confirm RED**
+- [x] **Step 3: Build native tests and confirm RED**
 
 ```powershell
 msbuild drivers\Rc901aHidFilter\tests\DescriptorCaptureTests.vcxproj /p:Configuration=Debug /p:Platform=x64
 ```
 
-- [ ] **Step 4: Implement the minimum capture helper and filter**
+- [x] **Step 4: Implement the minimum capture helper and filter**
 
 The driver must:
 
@@ -198,7 +198,7 @@ The driver must:
 - forward every other request unchanged;
 - never block report reads, write GATT characteristics, synthesize input, or patch bytes in capture-only mode.
 
-- [ ] **Step 5: Create an exact-match extension INF**
+- [x] **Step 5: Create an exact-match extension INF**
 
 The only model match is:
 
@@ -208,7 +208,7 @@ BTHLEDevice\{00001812-0000-1000-8000-00805f9b34fb}_Dev_VID&010416_PID&0301_REV&0
 
 The package includes/needs the inbox `hidbthle.inf` sections and adds `Rc901aHidFilter` as an `UpperFilters` entry. `ExcludeFromSelect=*` and `PnpLockdown=1` are required. No generic service UUID, name-only match, wildcard VID/PID, Xbox, or DualSense ID is allowed.
 
-- [ ] **Step 6: Run static/build verification GREEN**
+- [x] **Step 6: Run static/build verification GREEN**
 
 ```powershell
 msbuild drivers\Rc901aHidFilter\Rc901aHidFilter.sln /p:Configuration=Debug /p:Platform=x64

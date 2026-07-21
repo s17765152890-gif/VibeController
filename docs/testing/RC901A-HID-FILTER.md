@@ -29,6 +29,15 @@ Switching that one service node to the generic Microsoft GATT driver (`bthleenum
 
 The first driver package is a capture-only KMDF upper filter for the exact hardware ID above. Windows keeps the inbox `hidbthle`/`mshidumdf` stack. The filter post-processes only `IOCTL_HID_GET_REPORT_DESCRIPTOR`, copies the successful result into bounded nonpaged storage, and persists a diagnostic copy at PASSIVE_LEVEL.
 
+The exact device registry key receives these diagnostic values after a successful interception:
+
+- `Rc901aCapturedReportDescriptor` (`REG_BINARY`);
+- `Rc901aCapturedReportDescriptorLength` (`REG_DWORD`);
+- `Rc901aCapturedReportDescriptorSha256` (`REG_BINARY`, 32 bytes);
+- `Rc901aCaptureStatus` (`REG_DWORD`, `RC901A_CAPTURE_RESULT`).
+
+The filter forwards every other request without modification. Capture mode does not synthesize reports, write GATT characteristics, or change descriptor bytes.
+
 Repair mode remains disabled until a physical capture provides all of:
 
 1. raw descriptor bytes;
@@ -64,7 +73,20 @@ Current test environment:
 - Visual Studio Build Tools 2022 `17.14.36` is installed at `D:\Dev\VisualStudio\2022\BuildTools` with MSVC `14.44.35228.0`, MSBuild `17.14.51`, and Windows SDK `10.0.26100.0`.
 - The Build Tools installation is complete and launchable. A generic `PendingFileRenameOperations` marker remains after the completed restart, but RC901A and Build Tools state are healthy.
 - WDK `10.1.26100.6584` is installed with KMDF through `1.35`, x64 libraries, Windows Driver MSBuild targets, and `InfVerif.exe`.
-- The separate Visual Studio component `Component.Microsoft.Windows.DriverKit.BuildTools` is not installed yet. A minimal KMDF project reproduces `MSB8020` for the missing `WindowsKernelModeDriver10.0` PlatformToolset. Visual Studio Installer is open with that component selected for an interactive Modify operation.
+- Visual Studio components `Component.Microsoft.Windows.DriverKit.BuildTools` and `Microsoft.VisualStudio.Component.VC.14.44.17.14.x86.x64.Spectre` are installed. The `WindowsKernelModeDriver10.0` PlatformToolset and x64 Spectre libraries are present.
+- A minimal KMDF project built successfully on 2026-07-22 and produced `KmdfToolchainProbe.sys` with signing disabled. This verifies compilation and linking only; no driver was installed and no boot or signing policy was changed.
+
+Capture-filter verification on 2026-07-22:
+
+- native bounded-copy and SHA-256 tests passed;
+- the exact-match INF contract passed all six Pester tests;
+- the KMDF IRP-forwarding contract passed all three Pester tests and enforces framework-owned dispatch for target and non-target requests;
+- Debug x64 compilation, link, package signability, and catalog generation completed with no warnings;
+- x64 `InfVerif.exe /w` completed with no findings;
+- MSVC/WDK C/C++ Code Analysis completed with no findings;
+- WDK 10.0.26100 reports that Static Driver Verifier is no longer included and is incompatible with Visual Studio 2022. No SDV result is claimed; using an older EWDK solely for SDV remains optional before distribution.
+
+The WDK package-verifier task expects an x86 `InfVerif.dll` that this x64 WDK installation does not contain. The project therefore skips that broken in-build task and runs the installed x64 `InfVerif.exe /w` explicitly. Inf2Cat signability checking remains enabled. The package is unsigned and has not been installed.
 
 ## Rollback outline
 

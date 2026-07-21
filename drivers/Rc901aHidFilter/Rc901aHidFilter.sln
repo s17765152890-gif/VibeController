@@ -1,0 +1,24 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "Rc901aHidFilter", "driver\Rc901aHidFilter.vcxproj", "{1D7412C0-DB2A-4AC4-84CF-0EB18CC900A1}"
+EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "DescriptorCaptureTests", "tests\DescriptorCaptureTests.vcxproj", "{50604076-42F2-4F3F-AE34-02F0E1E5414D}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{1D7412C0-DB2A-4AC4-84CF-0EB18CC900A1}.Debug|x64.ActiveCfg = Debug|x64
+		{1D7412C0-DB2A-4AC4-84CF-0EB18CC900A1}.Debug|x64.Build.0 = Debug|x64
+		{1D7412C0-DB2A-4AC4-84CF-0EB18CC900A1}.Release|x64.ActiveCfg = Release|x64
+		{1D7412C0-DB2A-4AC4-84CF-0EB18CC900A1}.Release|x64.Build.0 = Release|x64
+		{50604076-42F2-4F3F-AE34-02F0E1E5414D}.Debug|x64.ActiveCfg = Debug|x64
+		{50604076-42F2-4F3F-AE34-02F0E1E5414D}.Debug|x64.Build.0 = Debug|x64
+		{50604076-42F2-4F3F-AE34-02F0E1E5414D}.Release|x64.ActiveCfg = Release|x64
+		{50604076-42F2-4F3F-AE34-02F0E1E5414D}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+EndGlobal
