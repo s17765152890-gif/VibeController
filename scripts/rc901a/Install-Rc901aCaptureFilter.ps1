@@ -1,13 +1,20 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [string]$PackageDirectory = (Join-Path $PSScriptRoot '..\..\drivers\Rc901aHidFilter\driver\x64\Debug\Rc901aHidFilter'),
+    [string]$PackageDirectory,
     [string]$InstanceId,
-    [string]$StatePath = (Join-Path $PSScriptRoot '..\..\artifacts\rc901a-driver-state-before.json'),
+    [string]$StatePath,
     [switch]$Apply,
     [switch]$FunctionsOnly
 )
 
 Set-StrictMode -Version Latest
+
+if ([string]::IsNullOrWhiteSpace($PackageDirectory)) {
+    $PackageDirectory = Join-Path $PSScriptRoot '..\..\drivers\Rc901aHidFilter\driver\x64\Debug\Rc901aHidFilter'
+}
+if ([string]::IsNullOrWhiteSpace($StatePath)) {
+    $StatePath = Join-Path $PSScriptRoot '..\..\artifacts\rc901a-driver-state-before.json'
+}
 
 . (Join-Path $PSScriptRoot 'Get-Rc901aDriverState.ps1') -StateFunctionsOnly
 

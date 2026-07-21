@@ -21,6 +21,17 @@ Describe 'RC901A capture-filter scripts' {
         $installContent | Should Match '-StateFunctionsOnly'
         $uninstallContent | Should Match '-StateFunctionsOnly'
     }
+
+    It 'computes install and rollback default paths after script startup' {
+        $installContent = Get-Content -LiteralPath $installScript -Raw
+        $uninstallContent = Get-Content -LiteralPath $uninstallScript -Raw
+
+        $installContent | Should Not Match '=\s*\(Join-Path\s+\$PSScriptRoot'
+        $uninstallContent | Should Not Match '=\s*\(Join-Path\s+\$PSScriptRoot'
+        $installContent | Should Match 'IsNullOrWhiteSpace\(\$PackageDirectory\)'
+        $installContent | Should Match 'IsNullOrWhiteSpace\(\$StatePath\)'
+        $uninstallContent | Should Match 'IsNullOrWhiteSpace\(\$StatePath\)'
+    }
 }
 
 if ((Test-Path -LiteralPath $installScript) -and (Test-Path -LiteralPath $uninstallScript)) {

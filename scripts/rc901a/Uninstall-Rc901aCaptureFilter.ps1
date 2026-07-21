@@ -1,11 +1,15 @@
 [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = 'High')]
 param(
-    [string]$StatePath = (Join-Path $PSScriptRoot '..\..\artifacts\rc901a-driver-state-before.json'),
+    [string]$StatePath,
     [switch]$Apply,
     [switch]$FunctionsOnly
 )
 
 Set-StrictMode -Version Latest
+
+if ([string]::IsNullOrWhiteSpace($StatePath)) {
+    $StatePath = Join-Path $PSScriptRoot '..\..\artifacts\rc901a-driver-state-before.json'
+}
 
 . (Join-Path $PSScriptRoot 'Get-Rc901aDriverState.ps1') -StateFunctionsOnly
 

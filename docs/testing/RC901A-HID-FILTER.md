@@ -63,7 +63,10 @@ Read-only state inspection:
 
 ```powershell
 .\scripts\rc901a\Get-Rc901aDriverState.ps1 | Format-List *
+.\scripts\rc901a\Start-Rc901aSecurityAudit.ps1
 ```
+
+The second command requests administrator approval only so Windows will allow it to read Secure Boot, BitLocker, BCD, and Device Guard state. It writes an ignored local JSON report under `artifacts` and does not change boot, certificate, driver, device, or restart state.
 
 Current test environment:
 
@@ -101,7 +104,7 @@ Both commands default to a non-mutating preview. A real operation additionally r
 
 The live preview on 2026-07-22 found the exact RC901A device and returned `Mode=WhatIf`, `WillMutate=False`, and `CatalogSignatureStatus=NotSigned`. No rollback-state file was created and no PnP mutation was attempted. The full device instance ID remains local and uncommitted.
 
-The current signing gate is therefore closed. Read-only inspection shows virtualization-based security enabled and kernel code-integrity policy enforced. Secure Boot and BCD test-signing state could not be read without elevation. Do not create trust certificates, enable `TESTSIGNING`, disable Secure Boot, or install the package without explicit user approval and a reboot/rollback plan.
+The current signing gate is therefore closed. The elevated read-only audit on 2026-07-22 confirmed that Secure Boot is enabled, the system volume is fully decrypted with BitLocker protection off, `testsigning`, `nointegritychecks`, and kernel debugging are not configured in the current BCD entry, the hypervisor starts automatically, and virtualization-based security plus kernel code-integrity enforcement are active. Do not create trust certificates, enable `TESTSIGNING`, disable Secure Boot, or install the package without explicit user approval and a reboot/rollback plan.
 
 ## Rollback outline
 
