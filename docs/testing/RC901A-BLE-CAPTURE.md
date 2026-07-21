@@ -28,7 +28,7 @@ This failure explains the Windows Settings badge, but it does not prove that the
 
 1. Put the remote within one metre of the computer and use fresh batteries.
 2. If Windows already lists `BT_RC901A_B1` but VibeController reports `Unreachable`, remove that device from **Settings → Bluetooth & devices**. This is necessary when Windows retains an old bond key while the remote has reset its key.
-3. Hold `Home + OK` together for about five seconds until the remote enters pairing mode.
+3. Hold the center D-pad `OK + Back` buttons together for about five seconds until the remote enters pairing mode. This is the verified combination for BT_RC901A_B1; it differs from some other TCL remote models.
 4. Add `BT_RC901A_B1` again in Windows and wait for pairing to complete.
 5. Do not pair the remote back to the TV during capture; most BLE remotes keep only one active host bond.
 6. Start VibeController, choose **TCL RC901A**, save, then press **Reconnect** in the direct-BLE panel.
@@ -62,7 +62,7 @@ The initial hardware probe established:
 - nine cached services: Generic Attribute, Generic Access, Battery, Device Information, HID, a second Generic Attribute service, D1FF, D0FF, and the excluded DFU service;
 - the default `DeviceInformation` view incorrectly reported paired devices as unpaired, while `DeviceInformationKind.AssociationEndpoint` reported the correct state;
 - the remote emitted both connectable-directed and connectable-undirected advertisements at roughly -60 to -70 dBm;
-- after `Home + OK`, 512 target advertisements were observed in 45 seconds;
+- during the pairing-mode test using `OK + Back`, 512 target advertisements were observed in 45 seconds;
 - Windows still returned `Unreachable`, which is consistent with stale host/remote bond keys and requires an explicit remove-and-re-pair before packet capture.
 
 Do not work around a stale bond by disabling Bluetooth security, installing an unsigned driver, or writing vendor/DFU characteristics.
@@ -71,4 +71,3 @@ Do not work around a stale bond by disabling Bluetooth security, installing an u
 
 - [Microsoft: Bluetooth GATT client](https://learn.microsoft.com/windows/uwp/devices-sensors/gatt-client)
 - [Microsoft: `GattSession.MaintainConnection`](https://learn.microsoft.com/uwp/api/windows.devices.bluetooth.genericattributeprofile.gattsession.maintainconnection)
-- [TCL: pair a Bluetooth remote with Home + OK](https://www.tcl.com/uk/en/support-tv/faq/37184)

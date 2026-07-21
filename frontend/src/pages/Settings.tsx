@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Battery, Bluetooth, Clipboard, Gamepad2, Lightbulb, Mic2, Radio, RefreshCw, Save, Trash2 } from "lucide-react";
 import { SliderField } from "../components/SliderField";
+import { rc901aPairingInstruction } from "../app/controllerPresentation";
 import type {
   CodexActivityStatus,
   CodexHookRegistrationStatus,
@@ -176,7 +177,7 @@ export function Settings({
                 <span><Radio size={14} />{rc901a?.subscribedCharacteristicCount ?? 0} 个数据通道</span>
               </div>
               <p className="rc901a-message">{rc901a?.message ?? "保存设置后，VibeController 会查找已配对的遥控器。"}</p>
-              <p className="rc901a-guidance">Windows HID 驱动不可用不影响 VibeController 直接 BLE 连接。麦克风键可触发 Codex 听写；遥控器自身音频暂未启用。</p>
+              <p className="rc901a-guidance">{rc901aPairingInstruction} Windows HID 驱动不可用不影响 VibeController 直接 BLE 连接。麦克风键可触发 Codex 听写；遥控器自身音频暂未启用。</p>
 
               <div className="rc901a-actions">
                 <button className="quiet-button" type="button" onClick={onRefreshRc901a} disabled={!onRefreshRc901a}><RefreshCw size={14} />重新连接</button>

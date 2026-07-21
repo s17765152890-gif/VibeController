@@ -41,7 +41,7 @@ VibeController 是一款面向 Windows 的开源桌面工具。它读取 Xbox Se
 
 Windows 可能为该遥控器显示“驱动程序错误”。已确认这是 Windows 通用 BLE HID 驱动无法解析遥控器固件中的 HID 报告描述符，不代表整个蓝牙设备不可用。VibeController 会绕过失败的 HID 子驱动，直接检查标准 HID 服务和 TCL 的 D0FF/D1FF GATT 通知服务。
 
-如果 Windows 显示“已配对”但 VibeController 报告 `Unreachable`，通常是电脑与遥控器保存的绑定密钥不同步：先在 Windows 蓝牙设置中删除 `BT_RC901A_B1`，再靠近电脑同时长按 `Home + OK` 约 5 秒并重新配对。完整步骤和安全采集规则见 [RC901A BLE 采集指南](docs/testing/RC901A-BLE-CAPTURE.md)。
+如果 Windows 显示“已配对”但 VibeController 报告 `Unreachable`，通常是电脑与遥控器保存的绑定密钥不同步：先在 Windows 蓝牙设置中删除 `BT_RC901A_B1`，再靠近电脑同时长按方向键中央的 `OK + 返回键` 约 5 秒并重新配对。完整步骤和安全采集规则见 [RC901A BLE 采集指南](docs/testing/RC901A-BLE-CAPTURE.md)。
 
 该后端不会写入 TCL 厂商特征或 DFU 服务；唯一允许的写操作是 BLE 标准要求的通知订阅描述符。Mic 键目前只能映射为 Codex 原生听写快捷键，遥控器麦克风音频尚未接入。
 
@@ -187,7 +187,7 @@ The current source tree includes a dedicated BT_RC901A_B1 backend, device picker
 
 Windows may show “Driver error” for this remote. Hardware probing confirmed that the generic BLE HID child driver rejects the firmware's HID report descriptor; that does not make the complete BLE device unusable. VibeController bypasses that child driver and inspects the standard HID plus TCL D0FF/D1FF notification services directly.
 
-If Windows says the remote is paired while VibeController reports `Unreachable`, remove `BT_RC901A_B1` from Windows Bluetooth settings, hold `Home + OK` near the computer for about five seconds, and pair it again. This repairs stale bond keys. See the [RC901A BLE capture guide](docs/testing/RC901A-BLE-CAPTURE.md) for the full safe workflow.
+If Windows says the remote is paired while VibeController reports `Unreachable`, remove `BT_RC901A_B1` from Windows Bluetooth settings, hold the center D-pad `OK + Back` buttons near the computer for about five seconds, and pair it again. This repairs stale bond keys. See the [RC901A BLE capture guide](docs/testing/RC901A-BLE-CAPTURE.md) for the full safe workflow.
 
 The backend never writes TCL vendor characteristics or the DFU service. Its only permitted write is the standard BLE notification-subscription descriptor. The Mic button can trigger Codex native dictation, but remote microphone audio is not supported yet.
 

@@ -1,5 +1,8 @@
 import type { ControllerType } from "./types";
 
+export const rc901aPairingInstruction =
+  "配对时，同时按住方向键中央 OK + 返回键约 5 秒。";
+
 export interface ControllerControlPresentation {
   key: string;
   label: string;

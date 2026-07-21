@@ -82,6 +82,7 @@ describe("Settings", () => {
     expect(screen.getByText("2 个数据通道")).toBeInTheDocument();
     expect(screen.getByText("00 A1 FF")).toBeInTheDocument();
     expect(screen.getByText(/Windows HID 驱动不可用不影响/)).toBeInTheDocument();
+    expect(screen.getByText(/方向键中央 OK \+ 返回键/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "重新连接" }));
     fireEvent.click(screen.getByRole("button", { name: "清除记录" }));
     expect(onRefreshRc901a).toHaveBeenCalledOnce();
