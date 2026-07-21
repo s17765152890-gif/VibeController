@@ -1,0 +1,76 @@
+# RC901A HID compatibility filter
+
+This document records the evidence and safety boundary for restoring standard Windows HID input on the TCL `BT_RC901A_B1`. Pairing already works. The remaining failure is in the HID-over-GATT interpretation layer, not Bluetooth discovery.
+
+## Observed device boundary
+
+| Field | Observed value |
+| --- | --- |
+| Device name | `BT_RC901A_B1` |
+| HID service | `00001812-0000-1000-8000-00805f9b34fb` |
+| Vendor ID | `0416` |
+| Product ID | `0301` |
+| Product revision | `0003` |
+| Exact hardware ID | `BTHLEDevice\{00001812-0000-1000-8000-00805f9b34fb}_Dev_VID&010416_PID&0301_REV&0003` |
+| Current driver | Microsoft `bthleenum.inf`, version `10.0.26100.8521` |
+| Current state | Started, problem code `0x00000000`, no device UpperFilters/LowerFilters |
+
+The Bluetooth address and full device instance ID are intentionally not recorded in source control.
+
+## Failure evidence
+
+With the Microsoft HID-over-GATT package (`hidbthle.inf`) selected, Windows stopped the HID service device with Code 10 and reported:
+
+> A non constant main item was declared without a corresponding usage.
+
+Switching that one service node to the generic Microsoft GATT driver (`bthleenum.inf`) removed the Device Manager error. It did not make button reports readable: WinRT and Win32 GATT report-map/report access still returned Access Denied. This proves the pairing, service enumeration, and PnP service PDO exist, but it does not prove that Windows can parse the remote's HID report descriptor.
+
+## Selected architecture
+
+The first driver package is a capture-only KMDF upper filter for the exact hardware ID above. Windows keeps the inbox `hidbthle`/`mshidumdf` stack. The filter post-processes only `IOCTL_HID_GET_REPORT_DESCRIPTOR`, copies the successful result into bounded nonpaged storage, and persists a diagnostic copy at PASSIVE_LEVEL.
+
+Repair mode remains disabled until a physical capture provides all of:
+
+1. raw descriptor bytes;
+2. descriptor length and SHA-256;
+3. the exact malformed main-item offset;
+4. reviewed expected and replacement bytes;
+5. managed and native regression tests.
+
+When repair mode is eventually enabled, any mismatch must forward the original descriptor unchanged.
+
+## Safety gates
+
+1. Never bind a package to the generic HID service UUID, a name-only match, or a wildcard VID/PID. Only VID `0416`, PID `0301`, revision `0003` is permitted.
+2. Never enable Windows `TESTSIGNING`, disable Secure Boot, or change BCD/boot policy without explicit user approval.
+3. Capture first. Do not infer whether the malformed item should become Constant or receive a Usage.
+4. Before installing a filter, save the current XML state, current INF, matching drivers, and uninstall/rollback commands.
+5. An installation script must default to dry-run, recheck the exact hardware ID immediately before mutation, and have a tested inverse operation.
+6. Do not touch RC901A's TCL DFU GATT service and do not write vendor characteristics.
+
+## Baseline commands
+
+Read-only state inspection:
+
+```powershell
+.\scripts\rc901a\Get-Rc901aDriverState.ps1 | Format-List *
+```
+
+Current test environment:
+
+- Windows build reports `pnputil` version `10.0.26200`.
+- Portable .NET SDK is used from the repository tool directory.
+- Pester `3.4.0` is available system-wide.
+- Visual Studio Build Tools and WDK are not installed yet; no kernel package can be built locally until Task 4 installs or locates a supported toolchain.
+
+## Rollback outline
+
+The concrete rollback script is deliberately deferred until the capture package exists. Before first installation it must record the service instance state shown by the read-only script. Rollback will remove only the RC901A filter package and restore the previously recorded Microsoft driver selection. It must not delete the Bluetooth pairing, remove class-wide filters, or touch Xbox/DualSense devices.
+
+## Primary references
+
+- [Microsoft BLE overview](https://learn.microsoft.com/en-us/windows-hardware/drivers/bluetooth/bluetooth-low-energy-overview)
+- [Preprocessing and postprocessing IRPs](https://learn.microsoft.com/en-us/windows-hardware/drivers/wdf/preprocessing-and-postprocessing-irps)
+- [`IOCTL_HID_GET_REPORT_DESCRIPTOR`](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/hidport/ni-hidport-ioctl_hid_get_report_descriptor)
+- [Microsoft Firefly KMDF HID filter sample](https://github.com/microsoft/Windows-driver-samples/tree/main/hid/firefly)
+- [Microsoft vhidmini2 sample](https://github.com/microsoft/Windows-driver-samples/tree/main/hid/vhidmini2)
