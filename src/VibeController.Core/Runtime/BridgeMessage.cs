@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using VibeController.Core.Devices;
 using VibeController.Core.Domain;
 
 namespace VibeController.Core.Runtime;
@@ -29,7 +30,8 @@ public sealed record RuntimeConfigurationPayload(
     bool CodexLightbarEnabled = false,
     MicrophoneStatus? Microphone = null,
     CodexHookRegistrationStatus? CodexHook = null,
-    CodexActivityStatus? CodexActivity = null);
+    CodexActivityStatus? CodexActivity = null,
+    Rc901aStatus? Rc901a = null);
 
 public static class BridgeMessageFactory
 {

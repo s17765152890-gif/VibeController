@@ -1,4 +1,5 @@
 using System.Text.Json;
+using VibeController.Core.Devices;
 using VibeController.Core.Domain;
 using VibeController.Core.Runtime;
 
@@ -38,6 +39,57 @@ public sealed class BridgeMessageTests
                 .GetProperty("configuration")
                 .GetProperty("controllerType")
                 .GetString());
+    }
+
+    [Fact]
+    public void RuntimeStateMessage_SerializesRc901aDiagnostics()
+    {
+        var state = new RuntimeState(
+            ControllerConnectionState.Connected,
+            ControllerIndex: 0,
+            MappingEnabled: true,
+            TestMode: false,
+            PacketNumber: 2,
+            Snapshot: ControllerSnapshot.Empty);
+        var sample = new Rc901aPacketSample(
+            DateTimeOffset.Parse("2026-07-21T12:00:00Z"),
+            Rc901aGattProfile.VendorD0Service,
+            Guid.Parse("0000ffd4-0000-1000-8000-00805f9b34fb"),
+            "00 A1 FF",
+            3);
+        var configuration = new RuntimeConfigurationPayload(
+            ControllerType.TclRc901a,
+            ActiveControllerIndex: 0,
+            CodexOnly: true,
+            DictationShortcut: "Ctrl+Alt+Shift+F12",
+            MouseSpeed: 50,
+            ScrollSpeed: 50,
+            DeadZone: 0.12f,
+            StartWithWindows: false,
+            Mappings: new Dictionary<string, string>(),
+            Rc901a: new Rc901aStatus(
+                Rc901aConnectionState.Connected,
+                "BT_RC901A_B1",
+                "ble-device-id",
+                87,
+                2,
+                "直接 BLE 已连接",
+                [sample]));
+
+        var json = BridgeJson.Serialize(
+            BridgeMessageFactory.RuntimeState(state, null, configuration));
+        using var document = JsonDocument.Parse(json);
+        var serialized = document.RootElement
+            .GetProperty("payload")
+            .GetProperty("configuration");
+
+        Assert.Equal("tclRc901a", serialized.GetProperty("controllerType").GetString());
+        var rc901a = serialized.GetProperty("rc901a");
+        Assert.Equal("connected", rc901a.GetProperty("connectionState").GetString());
+        Assert.Equal(87, rc901a.GetProperty("batteryPercent").GetInt32());
+        Assert.Equal(
+            "00 A1 FF",
+            rc901a.GetProperty("samples")[0].GetProperty("dataHex").GetString());
     }
 
     [Fact]
