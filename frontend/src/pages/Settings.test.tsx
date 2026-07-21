@@ -25,6 +25,69 @@ describe("Settings", () => {
     }));
   });
 
+  it("switches to TCL RC901A and hides the gamepad slot selector", () => {
+    const onSave = vi.fn();
+    render(<Settings onSave={onSave} onCopyDiagnostics={vi.fn()} />);
+
+    fireEvent.click(screen.getByLabelText("TCL RC901A"));
+
+    expect(screen.queryByLabelText("活动控制器")).not.toBeInTheDocument();
+    expect(screen.getByText("直接 BLE 模式")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "保存设置" }));
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      controllerType: "tclRc901a",
+    }));
+  });
+
+  it("shows RC901A direct BLE status and raw notification controls", () => {
+    const onRefreshRc901a = vi.fn();
+    const onClearRc901aSamples = vi.fn();
+    render(
+      <Settings
+        onSave={vi.fn()}
+        onCopyDiagnostics={vi.fn()}
+        onRefreshRc901a={onRefreshRc901a}
+        onClearRc901aSamples={onClearRc901aSamples}
+        initialValues={{
+          controllerType: "tclRc901a",
+          codexOnly: true,
+          startWithWindows: false,
+          deadZone: 0.18,
+          mouseSpeed: 50,
+          scrollSpeed: 50,
+          activeControllerIndex: 0,
+          dictationShortcut: "Ctrl+Alt+Shift+F12",
+          codexLightbarEnabled: false,
+        }}
+        rc901a={{
+          connectionState: "connected",
+          deviceName: "BT_RC901A_B1",
+          deviceId: "device-id",
+          batteryPercent: 87,
+          subscribedCharacteristicCount: 2,
+          message: "VibeController 直接 BLE 已连接。",
+          samples: [{
+            timestamp: "2026-07-21T12:00:00Z",
+            serviceUuid: "0000d0ff-3c17-d293-8e48-14fe2e4da212",
+            characteristicUuid: "0000ffd4-0000-1000-8000-00805f9b34fb",
+            dataHex: "00 A1 FF",
+            length: 3,
+          }],
+        }}
+      />,
+    );
+
+    expect(screen.getByText("BT_RC901A_B1")).toBeInTheDocument();
+    expect(screen.getByText("87% 电量")).toBeInTheDocument();
+    expect(screen.getByText("2 个数据通道")).toBeInTheDocument();
+    expect(screen.getByText("00 A1 FF")).toBeInTheDocument();
+    expect(screen.getByText(/Windows HID 驱动不可用不影响/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重新连接" }));
+    fireEvent.click(screen.getByRole("button", { name: "清除记录" }));
+    expect(onRefreshRc901a).toHaveBeenCalledOnce();
+    expect(onClearRc901aSamples).toHaveBeenCalledOnce();
+  });
+
   it("saves guard, startup and input tuning", () => {
     const onSave = vi.fn();
     render(<Settings onSave={onSave} onCopyDiagnostics={vi.fn()} />);

@@ -42,11 +42,13 @@ export function Dashboard({ state, onToggleMapping, onToggleTestMode }: Dashboar
         <section
           className="controller-card"
           data-disconnected={!connected}
-          aria-label="手柄实时状态"
+          aria-label="设备实时状态"
         >
           <div className="controller-meta">
             <span>{presentation.name}</span>
-            <span>控制器 {state.controllerIndex + 1} · 数据包 {state.packetNumber}</span>
+            <span>{controllerType === "tclRc901a"
+              ? `直接 BLE · 数据包 ${state.packetNumber}`
+              : `控制器 ${state.controllerIndex + 1} · 数据包 ${state.packetNumber}`}</span>
           </div>
           <ControllerVisual controllerType={controllerType} controls={state.controls} />
           {!connected && (

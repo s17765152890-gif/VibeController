@@ -16,6 +16,15 @@ const defaults: MappingValues = {
   rightStickUp: "keyboardShortcut", rightStickDown: "keyboardShortcut",
   view: "none", leftStickButton: "none", rightStickButton: "none",
   touchpadX: "mouseMove", touchpadY: "mouseMove", touchpadButton: "mouseLeftClick",
+  remoteOk: "send", remoteBack: "keyboardShortcut", remoteHome: "activateCodex",
+  remoteMenu: "commandPalette", remoteMic: "dictation",
+  remoteUp: "keyboardShortcut", remoteDown: "keyboardShortcut",
+  remoteLeft: "keyboardShortcut", remoteRight: "keyboardShortcut",
+  remoteVolumeUp: "none", remoteVolumeDown: "none", remoteMute: "none",
+  remoteChannelUp: "none", remoteChannelDown: "none",
+  remoteDigit0: "none", remoteDigit1: "none", remoteDigit2: "none",
+  remoteDigit3: "none", remoteDigit4: "none", remoteDigit5: "none",
+  remoteDigit6: "none", remoteDigit7: "none", remoteDigit8: "none", remoteDigit9: "none",
 };
 
 const defaultShortcuts: Record<string, string> = {
@@ -26,6 +35,11 @@ const defaultShortcuts: Record<string, string> = {
   rightStickRight: "ArrowRight",
   rightStickUp: "ArrowUp",
   rightStickDown: "ArrowDown",
+  remoteBack: "Backspace",
+  remoteUp: "ArrowUp",
+  remoteDown: "ArrowDown",
+  remoteLeft: "ArrowLeft",
+  remoteRight: "ArrowRight",
 };
 const exclusiveActions = new Set(["dictation", "send", "cancel", "commandPalette", "previousChat", "nextChat", "activateCodex"]);
 const codexShortcutActions = new Set([
@@ -66,7 +80,7 @@ export function MappingEditor({ controllerType = "xbox", onSave, onReset, initia
   const incoming = initialValues ?? {};
   const incomingActions = Object.fromEntries(Object.entries(incoming).map(([key, value]) => [key, value.startsWith("shortcut:") ? "keyboardShortcut" : value]));
   const incomingShortcuts = Object.fromEntries(Object.entries(incoming).filter(([, value]) => value.startsWith("shortcut:")).map(([key, value]) => [key, value.slice(9)]));
-  const [selected, setSelected] = useState("x");
+  const [selected, setSelected] = useState(controls[0]?.key ?? "x");
   const [values, setValues] = useState({ ...defaults, ...incomingActions });
   const [shortcuts, setShortcuts] = useState({ ...defaultShortcuts, ...incomingShortcuts });
   const [saved, setSaved] = useState(false);

@@ -137,4 +137,32 @@ describe("MappingEditor", () => {
       touchpadButton: "mouseLeftClick",
     }));
   });
+
+  it("uses neutral remote controls and RC901A defaults for TCL", () => {
+    const onSave = vi.fn();
+    render(
+      <MappingEditor
+        controllerType="tclRc901a"
+        onSave={onSave}
+        onReset={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "确认键" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "返回键" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "主页键" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "麦克风键" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "音量 +" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "保存映射" }));
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      remoteOk: "send",
+      remoteBack: "shortcut:Backspace",
+      remoteHome: "activateCodex",
+      remoteMenu: "commandPalette",
+      remoteMic: "dictation",
+      remoteLeft: "shortcut:ArrowLeft",
+      remoteRight: "shortcut:ArrowRight",
+    }));
+  });
 });

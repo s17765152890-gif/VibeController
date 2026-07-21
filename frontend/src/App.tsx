@@ -48,6 +48,7 @@ export default function App() {
           microphone={state.configuration?.microphone}
           codexHook={state.configuration?.codexHook}
           codexActivity={state.configuration?.codexActivity}
+          rc901a={state.configuration?.rc901a}
           onSave={(settings) => {
             setState((current) => ({
               ...current,
@@ -62,6 +63,8 @@ export default function App() {
             appBridge.send("updateSettings", settings);
           }}
           onRefreshIntegrations={() => appBridge.send("refreshIntegrations", {})}
+          onRefreshRc901a={() => appBridge.send("refreshRc901a", {})}
+          onClearRc901aSamples={() => appBridge.send("clearRc901aSamples", {})}
           onCopyDiagnostics={() => {
             void navigator.clipboard?.writeText(JSON.stringify({ version: "0.1.0", runtime: state }, null, 2));
             appBridge.send("requestState", { copyDiagnostics: true });

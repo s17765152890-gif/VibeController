@@ -105,8 +105,48 @@ const playStation5: ControllerPresentation = {
   ],
 };
 
+const tclRc901a: ControllerPresentation = {
+  name: "TCL BT_RC901A_B1",
+  statusName: "TCL RC901A",
+  connectedLabel: "TCL RC901A 已连接",
+  waitingName: "TCL RC901A",
+  subtitle: "通过直接 BLE 模式读取 TCL 遥控器。按麦克风键听写，按确认键发送。",
+  controls: [
+    { key: "remoteOk", label: "确认键", keycap: "OK" },
+    { key: "remoteBack", label: "返回键", keycap: "↩" },
+    { key: "remoteHome", label: "主页键", keycap: "⌂" },
+    { key: "remoteMenu", label: "菜单键", keycap: "☰" },
+    { key: "remoteMic", label: "麦克风键", keycap: "MIC" },
+    { key: "remoteUp", label: "方向键上", keycap: "↑" },
+    { key: "remoteDown", label: "方向键下", keycap: "↓" },
+    { key: "remoteLeft", label: "方向键左", keycap: "←" },
+    { key: "remoteRight", label: "方向键右", keycap: "→" },
+    { key: "remoteVolumeUp", label: "音量 +", keycap: "VOL+" },
+    { key: "remoteVolumeDown", label: "音量 −", keycap: "VOL−" },
+    { key: "remoteMute", label: "静音键", keycap: "MUTE" },
+    { key: "remoteChannelUp", label: "频道 +", keycap: "CH+" },
+    { key: "remoteChannelDown", label: "频道 −", keycap: "CH−" },
+    ...Array.from({ length: 10 }, (_, digit) => ({
+      key: `remoteDigit${digit}`,
+      label: `数字键 ${digit}`,
+      keycap: `${digit}`,
+    })),
+  ],
+  defaultActions: [
+    { action: "直接 BLE 模式", keycap: "RC901A" },
+    { action: "切换听写快捷键", keycap: "MIC" },
+    { action: "发送消息", keycap: "OK" },
+    { action: "删除上一个字符（Backspace）", keycap: "↩" },
+    { action: "激活 Codex 窗口", keycap: "⌂" },
+    { action: "打开命令菜单", keycap: "☰" },
+    { action: "移动输入光标", keycap: "方向键" },
+  ],
+};
+
 export function getControllerPresentation(
   controllerType: ControllerType = "xbox",
 ): ControllerPresentation {
-  return controllerType === "playStation5" ? playStation5 : xbox;
+  if (controllerType === "playStation5") return playStation5;
+  if (controllerType === "tclRc901a") return tclRc901a;
+  return xbox;
 }

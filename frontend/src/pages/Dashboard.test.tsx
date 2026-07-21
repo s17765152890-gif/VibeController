@@ -66,6 +66,34 @@ describe("Dashboard", () => {
     expect(screen.getByText("移动鼠标光标")).toBeInTheDocument();
   });
 
+  it("shows the TCL remote workspace in direct BLE mode", () => {
+    render(
+      <Dashboard
+        state={{
+          ...connectedState,
+          controls: { remoteOk: 1, remoteMic: 0 },
+          configuration: {
+            controllerType: "tclRc901a",
+            activeControllerIndex: 0,
+            codexOnly: true,
+            dictationShortcut: "Ctrl+Alt+Shift+F12",
+            mouseSpeed: 50,
+            scrollSpeed: 50,
+            deadZone: 0.12,
+            startWithWindows: false,
+            mappings: {},
+          },
+        }}
+        onToggleMapping={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("TCL RC901A 已连接")).toBeInTheDocument();
+    expect(screen.getByTestId("tcl-remote-visual")).toBeInTheDocument();
+    expect(screen.getByTestId("control-remote-ok")).toHaveAttribute("data-pressed", "true");
+    expect(screen.getByText("直接 BLE 模式")).toBeInTheDocument();
+  });
+
   it("pauses mapping from the primary control", () => {
     const onToggleMapping = vi.fn();
     render(<Dashboard state={connectedState} onToggleMapping={onToggleMapping} />);

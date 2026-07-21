@@ -1,7 +1,33 @@
 export type ConnectionState = "unknown" | "connected" | "disconnected";
-export type ControllerType = "xbox" | "playStation5";
+export type ControllerType = "xbox" | "playStation5" | "tclRc901a";
 export type MicrophoneDetectionState = "available" | "noDevices" | "error";
 export type CodexActivityState = "idle" | "working" | "needsAttention" | "completed";
+export type Rc901aConnectionState =
+  | "idle"
+  | "scanning"
+  | "connecting"
+  | "connected"
+  | "connectedLimited"
+  | "disconnected"
+  | "error";
+
+export interface Rc901aPacketSample {
+  timestamp: string;
+  serviceUuid: string;
+  characteristicUuid: string;
+  dataHex: string;
+  length: number;
+}
+
+export interface Rc901aStatus {
+  connectionState: Rc901aConnectionState;
+  deviceName: string | null;
+  deviceId: string | null;
+  batteryPercent: number | null;
+  subscribedCharacteristicCount: number;
+  message: string | null;
+  samples: Rc901aPacketSample[];
+}
 
 export interface MicrophoneStatus {
   state: MicrophoneDetectionState;
@@ -48,6 +74,7 @@ export interface RuntimeConfiguration {
   microphone?: MicrophoneStatus;
   codexHook?: CodexHookRegistrationStatus;
   codexActivity?: CodexActivityStatus;
+  rc901a?: Rc901aStatus;
 }
 
 export interface RuntimeStateMessage {
@@ -65,6 +92,8 @@ export type CommandType =
   | "updateSettings"
   | "resetDefaults"
   | "refreshIntegrations"
+  | "refreshRc901a"
+  | "clearRc901aSamples"
   | "requestState";
 
 export interface BridgeCommand<TPayload = unknown> {

@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Clipboard, Gamepad2, Lightbulb, Mic2, RefreshCw, Save } from "lucide-react";
+import { Battery, Bluetooth, Clipboard, Gamepad2, Lightbulb, Mic2, Radio, RefreshCw, Save, Trash2 } from "lucide-react";
 import { SliderField } from "../components/SliderField";
 import type {
   CodexActivityStatus,
   CodexHookRegistrationStatus,
   ControllerType,
   MicrophoneStatus,
+  Rc901aStatus,
 } from "../app/types";
 
 export interface SettingsValues {
@@ -24,10 +25,13 @@ interface SettingsProps {
   onSave(values: SettingsValues): void;
   onCopyDiagnostics(): void;
   onRefreshIntegrations?(): void;
+  onRefreshRc901a?(): void;
+  onClearRc901aSamples?(): void;
   initialValues?: SettingsValues;
   microphone?: MicrophoneStatus;
   codexHook?: CodexHookRegistrationStatus;
   codexActivity?: CodexActivityStatus;
+  rc901a?: Rc901aStatus;
 }
 
 const defaultSettings: SettingsValues = {
@@ -53,10 +57,13 @@ export function Settings({
   onSave,
   onCopyDiagnostics,
   onRefreshIntegrations,
+  onRefreshRc901a,
+  onClearRc901aSamples,
   initialValues,
   microphone,
   codexHook,
   codexActivity,
+  rc901a,
 }: SettingsProps) {
   const [values, setValues] = useState<SettingsValues>(initialValues ?? defaultSettings);
   const update = <K extends keyof SettingsValues>(key: K, value: SettingsValues[K]) =>
@@ -72,6 +79,17 @@ export function Settings({
       : values.codexLightbarEnabled
         ? "保存后安装 Hook"
         : "未启用";
+  const rc901aConnectionLabels = {
+    idle: "等待连接",
+    scanning: "正在查找",
+    connecting: "正在连接",
+    connected: "直接 BLE 已连接",
+    connectedLimited: "部分通道可用",
+    disconnected: "已断开",
+    error: "连接异常",
+  } as const;
+  const rc901aState = rc901a?.connectionState ?? "idle";
+  const rc901aSamples = rc901a?.samples ?? [];
 
   return (
     <main className="workspace-page settings-page">
@@ -106,7 +124,7 @@ export function Settings({
         <section className="settings-card device-settings-card">
           <h2>设备与 Codex</h2>
           <fieldset className="device-family-picker">
-            <legend>手柄类型</legend>
+            <legend>设备类型</legend>
             <div className="device-family-options">
               <label className="device-family-option" data-selected={values.controllerType === "xbox"}>
                 <input aria-label="Xbox 无线手柄" type="radio" name="controllerType" value="xbox" checked={values.controllerType === "xbox"} onChange={() => update("controllerType", "xbox")} />
@@ -120,18 +138,68 @@ export function Settings({
                 <span><strong>PS5 DualSense</strong><small>USB / 蓝牙 · 支持触控板</small></span>
                 <span className="selection-dot" aria-hidden="true" />
               </label>
+              <label className="device-family-option" data-selected={values.controllerType === "tclRc901a"}>
+                <input aria-label="TCL RC901A" type="radio" name="controllerType" value="tclRc901a" checked={values.controllerType === "tclRc901a"} onChange={() => update("controllerType", "tclRc901a")} />
+                <span className="device-family-icon device-family-icon--remote"><Radio size={19} /></span>
+                <span><strong>TCL RC901A</strong><small>直接 BLE · BT_RC901A_B1</small></span>
+                <span className="selection-dot" aria-hidden="true" />
+              </label>
             </div>
           </fieldset>
-          <label className="field-stack">
-            <span>活动控制器</span>
-            <select aria-label="活动控制器" value={values.activeControllerIndex} onChange={(event) => update("activeControllerIndex", Number(event.target.value))}>
-              {[0, 1, 2, 3].map((index) => <option key={index} value={index}>控制器 {index + 1}</option>)}
-            </select>
-          </label>
+          {values.controllerType !== "tclRc901a" && (
+            <label className="field-stack">
+              <span>活动控制器</span>
+              <select aria-label="活动控制器" value={values.activeControllerIndex} onChange={(event) => update("activeControllerIndex", Number(event.target.value))}>
+                {[0, 1, 2, 3].map((index) => <option key={index} value={index}>控制器 {index + 1}</option>)}
+              </select>
+            </label>
+          )}
           <div className="codex-sync-card" role="note">
             <span className="codex-sync-icon" aria-hidden="true"><RefreshCw size={17} /></span>
             <span><strong>自动同步 Codex 快捷键</strong><small>首次触发 Codex 操作时读取当前用户的设置；之后修改会自动刷新，无需重新映射。</small></span>
           </div>
+          {values.controllerType === "tclRc901a" && (
+            <section className="rc901a-direct-panel" aria-label="RC901A 直接 BLE 状态">
+              <div className="rc901a-panel-heading">
+                <div className="rc901a-device-identity">
+                  <span className="rc901a-device-icon" aria-hidden="true"><Bluetooth size={18} /></span>
+                  <div>
+                    <small>直接 BLE 模式</small>
+                    <strong>{rc901a?.deviceName ?? "BT_RC901A_B1"}</strong>
+                  </div>
+                </div>
+                <span className="rc901a-state" data-state={rc901aState}>{rc901aConnectionLabels[rc901aState]}</span>
+              </div>
+
+              <div className="rc901a-metrics">
+                <span><Battery size={14} />{rc901a?.batteryPercent == null ? "电量未知" : `${rc901a.batteryPercent}% 电量`}</span>
+                <span><Radio size={14} />{rc901a?.subscribedCharacteristicCount ?? 0} 个数据通道</span>
+              </div>
+              <p className="rc901a-message">{rc901a?.message ?? "保存设置后，VibeController 会查找已配对的遥控器。"}</p>
+              <p className="rc901a-guidance">Windows HID 驱动不可用不影响 VibeController 直接 BLE 连接。麦克风键可触发 Codex 听写；遥控器自身音频暂未启用。</p>
+
+              <div className="rc901a-actions">
+                <button className="quiet-button" type="button" onClick={onRefreshRc901a} disabled={!onRefreshRc901a}><RefreshCw size={14} />重新连接</button>
+                <button className="quiet-button" type="button" onClick={onClearRc901aSamples} disabled={!onClearRc901aSamples || rc901aSamples.length === 0}><Trash2 size={14} />清除记录</button>
+              </div>
+
+              <details className="rc901a-packet-log" open={rc901aSamples.length > 0}>
+                <summary>原始蓝牙数据 <span>{rc901aSamples.length}</span></summary>
+                {rc901aSamples.length === 0 ? (
+                  <p>连接后按下遥控器按键，这里会显示只读数据。</p>
+                ) : (
+                  <ol>
+                    {[...rc901aSamples].reverse().map((sample, index) => (
+                      <li key={`${sample.timestamp}-${sample.characteristicUuid}-${index}`}>
+                        <code>{sample.dataHex || "∅"}</code>
+                        <span>{sample.characteristicUuid.slice(4, 8).toUpperCase()} · {sample.length} B</span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </details>
+            </section>
+          )}
         </section>
 
         <section className="settings-card integration-card">
