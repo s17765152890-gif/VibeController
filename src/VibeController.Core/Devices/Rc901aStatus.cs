@@ -18,6 +18,12 @@ public sealed record Rc901aPacketSample(
     string DataHex,
     int Length);
 
+public sealed record Rc901aGattNotification(
+    DateTimeOffset Timestamp,
+    Guid ServiceUuid,
+    Guid CharacteristicUuid,
+    byte[] Data);
+
 public sealed record Rc901aStatus(
     Rc901aConnectionState ConnectionState,
     string? DeviceName,
