@@ -242,6 +242,33 @@ public sealed class JsonSettingsStoreTests : IDisposable
             actual.Profile.Mappings[ControllerControl.TouchpadButton].Kind);
     }
 
+    [Fact]
+    public async Task Load_AddsRc901aDefaultsToExistingProfilesWithoutReplacingCustomMappings()
+    {
+        var remoteControls = Enum.GetValues<ControllerControl>()
+            .Where(control => control.ToString().StartsWith("Remote", StringComparison.Ordinal))
+            .ToHashSet();
+        var oldMappings = DefaultProfileFactory.Create().Mappings
+            .Where(pair => !remoteControls.Contains(pair.Key))
+            .ToDictionary(pair => pair.Key, pair => pair.Value);
+        oldMappings[ControllerControl.X] = new MappedAction(MappedActionKind.Send);
+        var store = new JsonSettingsStore(_directory);
+        await store.SaveAsync(AppSettings.CreateDefault() with
+        {
+            Profile = new MappingProfile("Existing profile", oldMappings),
+        });
+
+        var actual = await store.LoadAsync();
+
+        Assert.Equal(MappedActionKind.Send, actual.Profile.Mappings[ControllerControl.X].Kind);
+        Assert.Equal(MappedActionKind.Send,
+            actual.Profile.Mappings[ControllerControl.RemoteOk].Kind);
+        Assert.Equal(MappedActionKind.CodexDictation,
+            actual.Profile.Mappings[ControllerControl.RemoteMic].Kind);
+        AssertShortcut(actual.Profile, ControllerControl.RemoteBack, "Backspace");
+        AssertShortcut(actual.Profile, ControllerControl.RemoteLeft, "ArrowLeft");
+    }
+
     private static void AssertShortcut(
         MappingProfile profile,
         ControllerControl control,

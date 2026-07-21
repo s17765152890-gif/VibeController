@@ -55,6 +55,19 @@ public sealed class Rc901aControllerAdapterTests
         Assert.Empty(result.Snapshot.Controls);
     }
 
+    [Fact]
+    public async Task RefreshAsync_StartsTheBleSessionAgain()
+    {
+        var session = new FakeSession();
+        using var adapter = new Rc901aControllerAdapter(
+            session,
+            new Rc901aReportInterpreter([]));
+
+        await adapter.RefreshAsync(CancellationToken.None);
+
+        Assert.Equal(2, session.StartCount);
+    }
+
     private static Rc901aGattNotification Notification(Guid characteristic, byte value) => new(
         DateTimeOffset.Parse("2026-07-21T12:00:00Z"),
         Rc901aGattProfile.VendorD0Service,
@@ -79,8 +92,13 @@ public sealed class Rc901aControllerAdapterTests
             null,
             []);
 
-        public Task StartAsync(string? preferredDeviceId, CancellationToken cancellationToken) =>
-            Task.CompletedTask;
+        public int StartCount { get; private set; }
+
+        public Task StartAsync(string? preferredDeviceId, CancellationToken cancellationToken)
+        {
+            StartCount++;
+            return Task.CompletedTask;
+        }
 
         public void ClearSamples()
         {

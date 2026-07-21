@@ -10,6 +10,9 @@ public static class WindowsControllerAdapterFactory
         {
             ControllerType.Xbox => new XInputControllerAdapter(),
             ControllerType.PlayStation5 => new DualSenseControllerAdapter(),
+            ControllerType.TclRc901a => new Rc901aControllerAdapter(
+                new Rc901aBleSession(new WindowsRc901aGattClient()),
+                new Rc901aReportInterpreter([])),
             _ => throw new ArgumentOutOfRangeException(
                 nameof(controllerType),
                 controllerType,

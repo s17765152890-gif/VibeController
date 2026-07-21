@@ -24,6 +24,7 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
     private AppSettings _settings = AppSettings.CreateDefault();
     private ControllerRuntime? _runtime;
     private IControllerLightbar? _lightbar;
+    private Rc901aControllerAdapter? _rc901aAdapter;
     private Task? _loop;
     private bool _testMode;
     private string? _lastJson;
@@ -44,6 +45,7 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
         CodexActivityState.Idle,
         LastEventAt: null,
         ActiveSessionCount: 0);
+    private Rc901aStatus _rc901aStatus = Rc901aStatus.Idle;
 
     public event Action<string>? StateJsonReady;
 
@@ -121,6 +123,15 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
                     break;
                 case "refreshIntegrations":
                     RefreshIntegrations();
+                    break;
+                case "refreshRc901a":
+                    if (_rc901aAdapter is not null)
+                    {
+                        await _rc901aAdapter.RefreshAsync(_cancellation.Token);
+                    }
+                    break;
+                case "clearRc901aSamples":
+                    _rc901aAdapter?.ClearSamples();
                     break;
             }
         }
@@ -200,6 +211,11 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
 
     private void RebuildRuntime()
     {
+        if (_rc901aAdapter is not null)
+        {
+            _rc901aAdapter.StatusChanged -= OnRc901aStatusChanged;
+            _rc901aAdapter = null;
+        }
         _runtime?.Dispose();
         var codex = new CodexWindowService();
         var executor = new WindowsActionExecutor(
@@ -207,6 +223,12 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
             codex,
             new CodexShortcutResolver());
         var adapter = WindowsControllerAdapterFactory.Create(_settings.ControllerType);
+        _rc901aAdapter = adapter as Rc901aControllerAdapter;
+        _rc901aStatus = _rc901aAdapter?.CurrentStatus ?? Rc901aStatus.Idle;
+        if (_rc901aAdapter is not null)
+        {
+            _rc901aAdapter.StatusChanged += OnRc901aStatusChanged;
+        }
         _lightbar = adapter as IControllerLightbar;
         _lightbarAnimation = new CodexActivityLightbarAnimation();
         _runtime = new ControllerRuntime(
@@ -214,6 +236,12 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
             new ActionDispatcher(codex, executor),
             _settings.Profile);
         ApplyLightbarColor(DateTimeOffset.UtcNow);
+    }
+
+    private void OnRc901aStatusChanged(Rc901aStatus status)
+    {
+        _rc901aStatus = status;
+        _stateDirty = true;
     }
 
     private async Task UpdateSettingsAsync(JsonElement payload)
@@ -383,7 +411,8 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
         _settings.CodexLightbarEnabled,
         _microphoneStatus,
         _codexHookStatus,
-        _codexActivity);
+        _codexActivity,
+        _rc901aStatus);
 
     private void RefreshIntegrations()
     {

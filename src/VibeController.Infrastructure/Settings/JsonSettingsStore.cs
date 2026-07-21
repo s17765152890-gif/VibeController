@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using VibeController.Core.Domain;
+using VibeController.Core.Mapping;
 
 namespace VibeController.Infrastructure.Settings;
 
@@ -113,6 +114,14 @@ public sealed class JsonSettingsStore : ISettingsStore
             profile,
             ControllerControl.TouchpadButton,
             new MappedAction(MappedActionKind.MouseLeftClick));
+        var defaults = DefaultProfileFactory.Create();
+        foreach (var control in RemoteControls)
+        {
+            profile = AddMappingIfMissing(
+                profile,
+                control,
+                defaults.Mappings[control]);
+        }
         result = result with { Profile = profile };
 
         return result;
@@ -132,6 +141,13 @@ public sealed class JsonSettingsStore : ISettingsStore
         ControllerControl.RightStickUp,
         ControllerControl.RightStickDown,
     ];
+
+    private static readonly ControllerControl[] RemoteControls =
+        Enum.GetValues<ControllerControl>()
+            .Where(control => control.ToString().StartsWith(
+                "Remote",
+                StringComparison.Ordinal))
+            .ToArray();
 
     private static bool MatchesPreviousRightStickDefaults(MappingProfile profile)
     {

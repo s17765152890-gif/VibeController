@@ -64,6 +64,9 @@ public sealed class Rc901aControllerAdapter : IControllerAdapter, IDisposable
 
     public void ClearSamples() => _session.ClearSamples();
 
+    public Task RefreshAsync(CancellationToken cancellationToken) =>
+        _session.StartAsync(null, cancellationToken);
+
     private void OnNotificationReceived(Rc901aGattNotification notification)
     {
         lock (_translationGate)
