@@ -8,6 +8,9 @@ namespace VibeController.Infrastructure.Windows;
 
 public sealed class WindowsRc901aGattClient : IRc901aGattClient
 {
+    public static DeviceInformationKind DeviceInformationKind { get; } =
+        DeviceInformationKind.AssociationEndpoint;
+
     private readonly List<GattDeviceService> _openServices = [];
     private readonly List<GattCharacteristic> _subscribedCharacteristics = [];
     private readonly Dictionary<GattCharacteristic, Guid> _serviceUuids = [];
@@ -24,7 +27,10 @@ public sealed class WindowsRc901aGattClient : IRc901aGattClient
         await CloseConnectionAsync();
 
         var selector = BluetoothLEDevice.GetDeviceSelectorFromPairingState(true);
-        var deviceInformation = await DeviceInformation.FindAllAsync(selector);
+        var deviceInformation = await DeviceInformation.FindAllAsync(
+            selector,
+            Array.Empty<string>(),
+            DeviceInformationKind);
         cancellationToken.ThrowIfCancellationRequested();
         var selected = Rc901aGattDiscoveryPolicy.SelectDevice(
             deviceInformation.Select(item => new Rc901aDeviceCandidate(
