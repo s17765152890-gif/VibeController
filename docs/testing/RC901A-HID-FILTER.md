@@ -88,9 +88,24 @@ Capture-filter verification on 2026-07-22:
 
 The WDK package-verifier task expects an x86 `InfVerif.dll` that this x64 WDK installation does not contain. The project therefore skips that broken in-build task and runs the installed x64 `InfVerif.exe /w` explicitly. Inf2Cat signability checking remains enabled. The package is unsigned and has not been installed.
 
+## Controlled installation workflow
+
+The installation and rollback entry points are:
+
+```powershell
+.\scripts\rc901a\Install-Rc901aCaptureFilter.ps1
+.\scripts\rc901a\Uninstall-Rc901aCaptureFilter.ps1 -StatePath .\artifacts\rc901a-driver-state-before.json
+```
+
+Both commands default to a non-mutating preview. A real operation additionally requires `-Apply`; `-Apply -WhatIf` remains non-mutating. Installation rechecks the exact hardware ID immediately before `pnputil`, refuses any catalog whose Authenticode status is not `Valid`, and refuses to overwrite an existing rollback baseline. Rollback validates the recorded hardware ID plus the installed OEM package's original name and provider before removing it. Rollback deliberately does not require the broken package to remain trusted, because signature failure must never prevent recovery.
+
+The live preview on 2026-07-22 found the exact RC901A device and returned `Mode=WhatIf`, `WillMutate=False`, and `CatalogSignatureStatus=NotSigned`. No rollback-state file was created and no PnP mutation was attempted. The full device instance ID remains local and uncommitted.
+
+The current signing gate is therefore closed. Read-only inspection shows virtualization-based security enabled and kernel code-integrity policy enforced. Secure Boot and BCD test-signing state could not be read without elevation. Do not create trust certificates, enable `TESTSIGNING`, disable Secure Boot, or install the package without explicit user approval and a reboot/rollback plan.
+
 ## Rollback outline
 
-The concrete rollback script is deliberately deferred until the capture package exists. Before first installation it must record the service instance state shown by the read-only script. Rollback will remove only the RC901A filter package and restore the previously recorded Microsoft driver selection. It must not delete the Bluetooth pairing, remove class-wide filters, or touch Xbox/DualSense devices.
+Before first installation, the install script records the service instance state shown by the read-only script. The rollback script removes only the validated RC901A OEM filter package and verifies that Windows returned to the previously recorded Microsoft driver selection. It does not delete the Bluetooth pairing, remove class-wide filters, or touch Xbox/DualSense devices.
 
 ## Primary references
 

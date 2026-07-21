@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
     [string]$InstanceId,
-    [switch]$FunctionsOnly
+    [Alias('FunctionsOnly')]
+    [switch]$StateFunctionsOnly
 )
 
 Set-StrictMode -Version Latest
@@ -98,6 +99,6 @@ function Get-Rc901aDriverState {
     }
 }
 
-if (-not $FunctionsOnly) {
+if (-not $StateFunctionsOnly) {
     Get-Rc901aDriverState -DeviceInstanceId $InstanceId
 }

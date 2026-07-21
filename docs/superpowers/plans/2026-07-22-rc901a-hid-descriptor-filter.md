@@ -234,11 +234,11 @@ git commit -m "feat: capture RC901A HID report descriptor"
 - Create: `artifacts/rc901a-report-descriptor-analysis.txt` (verification only; ignored)
 - Modify: `docs/testing/RC901A-HID-FILTER.md`
 
-- [ ] **Step 1: Write script dry-run tests before installer code**
+- [x] **Step 1: Write script dry-run tests before installer code**
 
 Tests verify both scripts default to `-WhatIf`, refuse any non-exact hardware ID, refuse an unsigned/untrusted package, and print the inverse rollback action. No test invokes `pnputil` or changes PnP state.
 
-- [ ] **Step 2: Implement dry-run-first installation scripts**
+- [x] **Step 2: Implement dry-run-first installation scripts**
 
 Installation requires an explicit `-Apply` switch and an exact instance-ID recheck immediately before each mutation. Uninstall removes only the RC901A filter package and restores the previously recorded driver selection.
 
