@@ -71,7 +71,7 @@ git commit -m "docs: define RC901A driver safety boundary"
 - Create: `src/VibeController.Core/Devices/HidReportDescriptorIssue.cs`
 - Test: `tests/VibeController.Core.Tests/Devices/HidReportDescriptorTests.cs`
 
-- [ ] **Step 1: Write failing parser tests**
+- [x] **Step 1: Write failing parser tests**
 
 Cover short items with 0/1/2/4-byte payloads, the `0xFE` long-item form, global Push/Pop, local Usage/Usage Minimum/Usage Maximum, Collection/End Collection, and truncated input. Every parsed item must retain its byte offset, prefix, data bytes, item type, tag, and signed/unsigned values.
 
@@ -85,7 +85,7 @@ public void Parse_RetainsOffsetAndPayload()
 }
 ```
 
-- [ ] **Step 2: Run the focused test and confirm RED**
+- [x] **Step 2: Run the focused test and confirm RED**
 
 ```powershell
 .\.tools\dotnet\dotnet.exe test tests\VibeController.Core.Tests --filter FullyQualifiedName~HidReportDescriptorTests
@@ -93,15 +93,15 @@ public void Parse_RetainsOffsetAndPayload()
 
 Expected: compilation fails because `HidReportDescriptor` does not exist.
 
-- [ ] **Step 3: Implement the minimum parser**
+- [x] **Step 3: Implement the minimum parser**
 
 The parser must reject malformed/truncated descriptors with an exception containing the failing byte offset. It must not normalize, mutate, or infer missing bytes.
 
-- [ ] **Step 4: Write failing semantic-diagnostic tests**
+- [x] **Step 4: Write failing semantic-diagnostic tests**
 
 Use a valid consumer-control fixture and a malformed fixture in which a non-constant Input/Output/Feature main item has no corresponding local Usage or Usage range. Verify that diagnostics identify the main-item byte offset and use the same plain-language reason Windows reported.
 
-- [ ] **Step 5: Implement diagnostics and run GREEN**
+- [x] **Step 5: Implement diagnostics and run GREEN**
 
 Local items reset after every Main item. Constant main items are not flagged. Data main items without a local Usage/Usage range emit `MissingUsageForDataMainItem`; diagnostics are candidates, not automatic repairs.
 
@@ -109,7 +109,7 @@ Local items reset after every Main item. Constant main items are not flagged. Da
 .\.tools\dotnet\dotnet.exe test tests\VibeController.Core.Tests --filter FullyQualifiedName~HidReportDescriptorTests
 ```
 
-- [ ] **Step 6: Commit the analyzer**
+- [x] **Step 6: Commit the analyzer**
 
 ```powershell
 git add src/VibeController.Core/Devices tests/VibeController.Core.Tests/Devices
