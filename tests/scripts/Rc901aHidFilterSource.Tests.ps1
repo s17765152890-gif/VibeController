@@ -1,6 +1,12 @@
 $sourcePath = Join-Path $PSScriptRoot '..\..\drivers\Rc901aHidFilter\driver\Device.c'
 
 Describe 'RC901A KMDF IRP forwarding contract' {
+    It 'intercepts HID report descriptor requests on the kernel internal-device-control path' {
+        $content = Get-Content -LiteralPath $sourcePath -Raw
+
+        $content | Should Match 'WdfDeviceInitAssignWdmIrpPreprocessCallback\s*\(\s*DeviceInit\s*,\s*Rc901aEvtWdmIrpPreprocess\s*,\s*IRP_MJ_INTERNAL_DEVICE_CONTROL'
+    }
+
     It 'returns both target and non-target requests through the KMDF preprocessed dispatcher' {
         $content = Get-Content -LiteralPath $sourcePath -Raw
         $dispatchCalls = [regex]::Matches($content, 'WdfDeviceWdmDispatchPreprocessedIrp\s*\(\s*Device\s*,\s*Irp\s*\)')

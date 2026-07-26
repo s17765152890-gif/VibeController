@@ -40,7 +40,7 @@ Rc901aEvtDeviceAdd(
     status = WdfDeviceInitAssignWdmIrpPreprocessCallback(
         DeviceInit,
         Rc901aEvtWdmIrpPreprocess,
-        IRP_MJ_DEVICE_CONTROL,
+        IRP_MJ_INTERNAL_DEVICE_CONTROL,
         NULL,
         0
         );
