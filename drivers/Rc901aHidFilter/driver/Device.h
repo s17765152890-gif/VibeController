@@ -6,6 +6,7 @@
 #include "DescriptorCapture.h"
 
 #define RC901A_MAX_OBSERVED_REQUESTS 32U
+#define RC901A_MAX_DIAGNOSTIC_BUFFER_SIZE 1024U
 
 typedef struct _RC901A_DEVICE_CONTEXT {
     WDFSPINLOCK CaptureLock;
@@ -22,6 +23,12 @@ typedef struct _RC901A_DEVICE_CONTEXT {
     ULONG CompletionCount;
     NTSTATUS LastCompletionStatus;
     ULONG LastCompletionInformation;
+    ULONG ObservedInputBufferLength;
+    ULONG ObservedOutputBufferLength;
+    ULONG ObservedInputCapturedLength;
+    unsigned char ObservedInputBuffer[RC901A_MAX_DIAGNOSTIC_BUFFER_SIZE];
+    ULONG ObservedCompletionCapturedLength;
+    unsigned char ObservedCompletionBuffer[RC901A_MAX_DIAGNOSTIC_BUFFER_SIZE];
     volatile LONG CaptureGeneration;
     volatile LONG WorkItemQueued;
 } RC901A_DEVICE_CONTEXT, *PRC901A_DEVICE_CONTEXT;

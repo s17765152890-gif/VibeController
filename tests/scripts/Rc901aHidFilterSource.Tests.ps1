@@ -34,7 +34,7 @@ Describe 'RC901A KMDF IRP forwarding contract' {
     It 'records every control request before selecting the report-descriptor IOCTL' {
         $content = Get-Content -LiteralPath $sourcePath -Raw
         $observeIndex = $content.IndexOf('deviceContext->ObservedRequestCount += 1U;')
-        $targetIndex = $content.IndexOf('!= IOCTL_HID_GET_REPORT_DESCRIPTOR')
+        $targetIndex = $content.IndexOf('== IOCTL_HID_GET_REPORT_DESCRIPTOR')
 
         ($observeIndex -ge 0) | Should Be $true
         ($targetIndex -ge 0) | Should Be $true
@@ -61,5 +61,19 @@ Describe 'RC901A KMDF IRP forwarding contract' {
 
         $content | Should Match 'IoCopyCurrentIrpStackLocationToNext\s*\(\s*Irp\s*\)'
         $content | Should Match 'IoSetCompletionRoutine\s*\('
+    }
+
+    It 'captures the translated buffered UMDF request without changing its result' {
+        $content = Get-Content -LiteralPath $sourcePath -Raw
+
+        $content | Should Match 'RC901A_UMDF_TRANSPORT_IOCTL'
+        $content | Should Match 'FILE_DEVICE_BLUETOOTH\s*,\s*0x489'
+        $content | Should Match 'METHOD_BUFFERED'
+        $content | Should Match 'AssociatedIrp\.SystemBuffer'
+        $content | Should Match 'Rc901aObservedInputBufferLength'
+        $content | Should Match 'Rc901aObservedOutputBufferLength'
+        $content | Should Match 'Rc901aObservedInputBuffer'
+        $content | Should Match 'Rc901aObservedCompletionBuffer'
+        $content | Should Match 'STATUS_CONTINUE_COMPLETION'
     }
 }
