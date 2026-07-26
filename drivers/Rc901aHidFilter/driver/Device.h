@@ -11,6 +11,12 @@ typedef struct _RC901A_DEVICE_CONTEXT {
     unsigned char Descriptor[RC901A_MAX_REPORT_DESCRIPTOR_SIZE];
     size_t DescriptorLength;
     RC901A_CAPTURE_RESULT CaptureStatus;
+    ULONG ObservedRequestCount;
+    ULONG LastMajorFunction;
+    ULONG LastIoControlCode;
+    ULONG CompletionCount;
+    NTSTATUS LastCompletionStatus;
+    ULONG LastCompletionInformation;
     volatile LONG CaptureGeneration;
     volatile LONG WorkItemQueued;
 } RC901A_DEVICE_CONTEXT, *PRC901A_DEVICE_CONTEXT;

@@ -10,6 +10,28 @@
 static IO_COMPLETION_ROUTINE Rc901aReportDescriptorCompletion;
 
 static VOID
+Rc901aPersistAttachMarker(
+    _In_ WDFDEVICE Device
+    )
+{
+    WDFKEY deviceKey;
+    NTSTATUS status;
+    DECLARE_CONST_UNICODE_STRING(attachedName, L"Rc901aFilterAttached");
+
+    status = WdfDeviceOpenRegistryKey(
+        Device,
+        PLUGPLAY_REGKEY_DEVICE,
+        KEY_SET_VALUE,
+        WDF_NO_OBJECT_ATTRIBUTES,
+        &deviceKey
+        );
+    if (NT_SUCCESS(status)) {
+        (void)WdfRegistryAssignULong(deviceKey, &attachedName, 1U);
+        WdfRegistryClose(deviceKey);
+    }
+}
+
+static VOID
 Rc901aQueuePersistWorkItem(
     _In_ PRC901A_DEVICE_CONTEXT Context
     )
@@ -48,6 +70,17 @@ Rc901aEvtDeviceAdd(
         return status;
     }
 
+    status = WdfDeviceInitAssignWdmIrpPreprocessCallback(
+        DeviceInit,
+        Rc901aEvtWdmIrpPreprocess,
+        IRP_MJ_DEVICE_CONTROL,
+        NULL,
+        0
+        );
+    if (!NT_SUCCESS(status)) {
+        return status;
+    }
+
     WDF_OBJECT_ATTRIBUTES_INIT_CONTEXT_TYPE(&deviceAttributes, RC901A_DEVICE_CONTEXT);
     status = WdfDeviceCreate(&DeviceInit, &deviceAttributes, &device);
     if (!NT_SUCCESS(status)) {
@@ -57,6 +90,12 @@ Rc901aEvtDeviceAdd(
     context = Rc901aGetDeviceContext(device);
     context->DescriptorLength = 0U;
     context->CaptureStatus = Rc901aCaptureEmpty;
+    context->ObservedRequestCount = 0U;
+    context->LastMajorFunction = 0U;
+    context->LastIoControlCode = 0U;
+    context->CompletionCount = 0U;
+    context->LastCompletionStatus = STATUS_PENDING;
+    context->LastCompletionInformation = 0U;
     context->CaptureGeneration = 0;
     context->WorkItemQueued = 0;
 
@@ -75,6 +114,9 @@ Rc901aEvtDeviceAdd(
         &childAttributes,
         &context->PersistWorkItem
         );
+    if (NT_SUCCESS(status)) {
+        Rc901aPersistAttachMarker(device);
+    }
 
     return status;
 }
@@ -86,6 +128,7 @@ Rc901aEvtWdmIrpPreprocess(
     PIRP Irp
     )
 {
+    PRC901A_DEVICE_CONTEXT deviceContext;
     PIO_STACK_LOCATION stack;
 
     stack = IoGetCurrentIrpStackLocation(Irp);
@@ -93,6 +136,15 @@ Rc901aEvtWdmIrpPreprocess(
         IoSkipCurrentIrpStackLocation(Irp);
         return WdfDeviceWdmDispatchPreprocessedIrp(Device, Irp);
     }
+
+    deviceContext = Rc901aGetDeviceContext(Device);
+    WdfSpinLockAcquire(deviceContext->CaptureLock);
+    deviceContext->ObservedRequestCount += 1U;
+    deviceContext->LastMajorFunction = (ULONG)stack->MajorFunction;
+    deviceContext->LastIoControlCode = stack->Parameters.DeviceIoControl.IoControlCode;
+    (void)InterlockedIncrement(&deviceContext->CaptureGeneration);
+    WdfSpinLockRelease(deviceContext->CaptureLock);
+    Rc901aQueuePersistWorkItem(deviceContext);
 
     IoCopyCurrentIrpStackLocationToNext(Irp);
     IoSetCompletionRoutine(
@@ -127,11 +179,13 @@ Rc901aReportDescriptorCompletion(
     deviceContext = Rc901aGetDeviceContext(device);
     bytesWritten = 0U;
     captureStatus = Rc901aCaptureInvalidArgument;
+    returnedLength = (size_t)Irp->IoStatus.Information;
 
+    WdfSpinLockAcquire(deviceContext->CaptureLock);
+    deviceContext->CompletionCount += 1U;
+    deviceContext->LastCompletionStatus = Irp->IoStatus.Status;
+    deviceContext->LastCompletionInformation = (ULONG)Irp->IoStatus.Information;
     if (NT_SUCCESS(Irp->IoStatus.Status)) {
-        returnedLength = (size_t)Irp->IoStatus.Information;
-
-        WdfSpinLockAcquire(deviceContext->CaptureLock);
         __try {
             captureStatus = Rc901aCopyDescriptor(
                 (const unsigned char*)Irp->UserBuffer,
@@ -148,10 +202,10 @@ Rc901aReportDescriptorCompletion(
 
         deviceContext->DescriptorLength = bytesWritten;
         deviceContext->CaptureStatus = captureStatus;
-        (void)InterlockedIncrement(&deviceContext->CaptureGeneration);
-        WdfSpinLockRelease(deviceContext->CaptureLock);
-        Rc901aQueuePersistWorkItem(deviceContext);
     }
+    (void)InterlockedIncrement(&deviceContext->CaptureGeneration);
+    WdfSpinLockRelease(deviceContext->CaptureLock);
+    Rc901aQueuePersistWorkItem(deviceContext);
 
     return STATUS_CONTINUE_COMPLETION;
 }
@@ -169,12 +223,24 @@ Rc901aEvtPersistCapture(
     unsigned char digest[RC901A_SHA256_DIGEST_SIZE];
     size_t descriptorLength;
     RC901A_CAPTURE_RESULT captureStatus;
+    ULONG observedRequestCount;
+    ULONG lastMajorFunction;
+    ULONG lastIoControlCode;
+    ULONG completionCount;
+    NTSTATUS lastCompletionStatus;
+    ULONG lastCompletionInformation;
     LONG persistedGeneration;
     NTSTATUS status;
     DECLARE_CONST_UNICODE_STRING(descriptorName, L"Rc901aCapturedReportDescriptor");
     DECLARE_CONST_UNICODE_STRING(lengthName, L"Rc901aCapturedReportDescriptorLength");
     DECLARE_CONST_UNICODE_STRING(digestName, L"Rc901aCapturedReportDescriptorSha256");
     DECLARE_CONST_UNICODE_STRING(statusName, L"Rc901aCaptureStatus");
+    DECLARE_CONST_UNICODE_STRING(requestCountName, L"Rc901aObservedRequestCount");
+    DECLARE_CONST_UNICODE_STRING(majorFunctionName, L"Rc901aLastMajorFunction");
+    DECLARE_CONST_UNICODE_STRING(ioControlCodeName, L"Rc901aLastIoControlCode");
+    DECLARE_CONST_UNICODE_STRING(completionCountName, L"Rc901aCompletionCount");
+    DECLARE_CONST_UNICODE_STRING(completionStatusName, L"Rc901aLastCompletionStatus");
+    DECLARE_CONST_UNICODE_STRING(completionInformationName, L"Rc901aLastCompletionInformation");
 
     device = (WDFDEVICE)WdfWorkItemGetParentObject(WorkItem);
     context = Rc901aGetDeviceContext(device);
@@ -191,6 +257,12 @@ Rc901aEvtPersistCapture(
     WdfSpinLockAcquire(context->CaptureLock);
     descriptorLength = context->DescriptorLength;
     captureStatus = context->CaptureStatus;
+    observedRequestCount = context->ObservedRequestCount;
+    lastMajorFunction = context->LastMajorFunction;
+    lastIoControlCode = context->LastIoControlCode;
+    completionCount = context->CompletionCount;
+    lastCompletionStatus = context->LastCompletionStatus;
+    lastCompletionInformation = context->LastCompletionInformation;
     persistedGeneration = InterlockedCompareExchange(&context->CaptureGeneration, 0, 0);
     if (descriptorLength > 0U && descriptorLength <= RC901A_MAX_REPORT_DESCRIPTOR_SIZE) {
         RtlCopyMemory(descriptor, context->Descriptor, descriptorLength);
@@ -207,6 +279,12 @@ Rc901aEvtPersistCapture(
     if (NT_SUCCESS(status)) {
         (void)WdfRegistryAssignULong(deviceKey, &statusName, (ULONG)captureStatus);
         (void)WdfRegistryAssignULong(deviceKey, &lengthName, (ULONG)descriptorLength);
+        (void)WdfRegistryAssignULong(deviceKey, &requestCountName, observedRequestCount);
+        (void)WdfRegistryAssignULong(deviceKey, &majorFunctionName, lastMajorFunction);
+        (void)WdfRegistryAssignULong(deviceKey, &ioControlCodeName, lastIoControlCode);
+        (void)WdfRegistryAssignULong(deviceKey, &completionCountName, completionCount);
+        (void)WdfRegistryAssignULong(deviceKey, &completionStatusName, (ULONG)lastCompletionStatus);
+        (void)WdfRegistryAssignULong(deviceKey, &completionInformationName, lastCompletionInformation);
 
         if (captureStatus == Rc901aCaptureSuccess &&
             descriptorLength > 0U &&

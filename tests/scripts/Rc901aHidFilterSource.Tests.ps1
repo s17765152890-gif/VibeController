@@ -1,10 +1,30 @@
 $sourcePath = Join-Path $PSScriptRoot '..\..\drivers\Rc901aHidFilter\driver\Device.c'
 
 Describe 'RC901A KMDF IRP forwarding contract' {
-    It 'intercepts HID report descriptor requests on the kernel internal-device-control path' {
+    It 'observes both HID control paths around the UMDF translation boundary' {
+        $content = Get-Content -LiteralPath $sourcePath -Raw
+        $registrations = [regex]::Matches(
+            $content,
+            'WdfDeviceInitAssignWdmIrpPreprocessCallback\s*\(\s*DeviceInit\s*,\s*Rc901aEvtWdmIrpPreprocess\s*,\s*(IRP_MJ_(?:INTERNAL_)?DEVICE_CONTROL)'
+        )
+
+        $registrations.Count | Should Be 2
+        @($registrations | ForEach-Object { $_.Groups[1].Value }) | Should Be @(
+            'IRP_MJ_INTERNAL_DEVICE_CONTROL',
+            'IRP_MJ_DEVICE_CONTROL'
+        )
+    }
+
+    It 'persists attach request and completion diagnostics beside the captured descriptor' {
         $content = Get-Content -LiteralPath $sourcePath -Raw
 
-        $content | Should Match 'WdfDeviceInitAssignWdmIrpPreprocessCallback\s*\(\s*DeviceInit\s*,\s*Rc901aEvtWdmIrpPreprocess\s*,\s*IRP_MJ_INTERNAL_DEVICE_CONTROL'
+        $content | Should Match 'Rc901aFilterAttached'
+        $content | Should Match 'Rc901aObservedRequestCount'
+        $content | Should Match 'Rc901aLastMajorFunction'
+        $content | Should Match 'Rc901aLastIoControlCode'
+        $content | Should Match 'Rc901aCompletionCount'
+        $content | Should Match 'Rc901aLastCompletionStatus'
+        $content | Should Match 'Rc901aLastCompletionInformation'
     }
 
     It 'returns both target and non-target requests through the KMDF preprocessed dispatcher' {
