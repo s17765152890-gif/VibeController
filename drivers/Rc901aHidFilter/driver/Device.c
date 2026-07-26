@@ -131,11 +131,6 @@ Rc901aEvtWdmIrpPreprocess(
     PIO_STACK_LOCATION stack;
 
     stack = IoGetCurrentIrpStackLocation(Irp);
-    if (stack->Parameters.DeviceIoControl.IoControlCode != IOCTL_HID_GET_REPORT_DESCRIPTOR) {
-        IoSkipCurrentIrpStackLocation(Irp);
-        return WdfDeviceWdmDispatchPreprocessedIrp(Device, Irp);
-    }
-
     deviceContext = Rc901aGetDeviceContext(Device);
     WdfSpinLockAcquire(deviceContext->CaptureLock);
     deviceContext->ObservedRequestCount += 1U;
@@ -144,6 +139,11 @@ Rc901aEvtWdmIrpPreprocess(
     (void)InterlockedIncrement(&deviceContext->CaptureGeneration);
     WdfSpinLockRelease(deviceContext->CaptureLock);
     Rc901aQueuePersistWorkItem(deviceContext);
+
+    if (stack->Parameters.DeviceIoControl.IoControlCode != IOCTL_HID_GET_REPORT_DESCRIPTOR) {
+        IoSkipCurrentIrpStackLocation(Irp);
+        return WdfDeviceWdmDispatchPreprocessedIrp(Device, Irp);
+    }
 
     IoCopyCurrentIrpStackLocationToNext(Irp);
     IoSetCompletionRoutine(

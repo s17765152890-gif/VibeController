@@ -29,6 +29,16 @@ Describe 'RC901A KMDF IRP forwarding contract' {
         $content | Should Match 'Rc901aLastCompletionInformation'
     }
 
+    It 'records every control request before selecting the report-descriptor IOCTL' {
+        $content = Get-Content -LiteralPath $sourcePath -Raw
+        $observeIndex = $content.IndexOf('deviceContext->ObservedRequestCount += 1U;')
+        $targetIndex = $content.IndexOf('!= IOCTL_HID_GET_REPORT_DESCRIPTOR')
+
+        ($observeIndex -ge 0) | Should Be $true
+        ($targetIndex -ge 0) | Should Be $true
+        ($observeIndex -lt $targetIndex) | Should Be $true
+    }
+
     It 'returns both target and non-target requests through the KMDF preprocessed dispatcher' {
         $content = Get-Content -LiteralPath $sourcePath -Raw
         $dispatchCalls = [regex]::Matches($content, 'WdfDeviceWdmDispatchPreprocessedIrp\s*\(\s*Device\s*,\s*Irp\s*\)')
