@@ -22,6 +22,8 @@ Describe 'RC901A KMDF IRP forwarding contract' {
         $content | Should Not Match 'PLUGPLAY_REGKEY_DEVICE'
         $content | Should Match 'Rc901aFilterAttached'
         $content | Should Match 'Rc901aObservedRequestCount'
+        $content | Should Match 'Rc901aObservedMajorFunctions'
+        $content | Should Match 'Rc901aObservedIoControlCodes'
         $content | Should Match 'Rc901aLastMajorFunction'
         $content | Should Match 'Rc901aLastIoControlCode'
         $content | Should Match 'Rc901aCompletionCount'

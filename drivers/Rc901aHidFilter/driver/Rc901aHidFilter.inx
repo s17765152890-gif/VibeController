@@ -36,10 +36,17 @@ CopyFiles = Rc901aHidFilter.CopyFiles
 [Rc901aHidFilter_Install.NT.hw]
 Include = hidbthle.inf
 Needs = HidBthLE.NT.hw
-AddReg = Rc901aHidFilter.UpperFilter
+AddReg = Rc901aHidFilter.FilterLevels
 
-[Rc901aHidFilter.UpperFilter]
-HKR,,UpperFilters,0x00010008,"Rc901aHidFilter"
+[Rc901aHidFilter.FilterLevels]
+HKR,,LowerFilterLevels,0x00010000,"Rc901aCapture","Default"
+HKR,,LowerFilterDefaultLevel,,"Default"
+
+[Rc901aHidFilter_Install.NT.Filters]
+AddFilter = Rc901aHidFilter,,Rc901aHidFilter.LowerFilter
+
+[Rc901aHidFilter.LowerFilter]
+FilterLevel = Rc901aCapture
 
 [Rc901aHidFilter_Install.NT.Services]
 Include = hidbthle.inf

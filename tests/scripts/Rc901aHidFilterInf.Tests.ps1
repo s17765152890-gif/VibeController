@@ -35,10 +35,14 @@ Describe 'RC901A HID capture filter INF safety boundary' {
         $content | Should Match '(?im)^\s*Needs\s*=\s*HidBthLE\.NT\.Wdf\s*$'
     }
 
-    It 'adds only the RC901A capture filter and remains hidden from manual selection' {
+    It 'places the capture filter immediately below the function driver and keeps WUDFRd in the default lower level' {
         $content = Get-Content -LiteralPath $infPath -Raw
 
-        $content | Should Match '(?im)^\s*HKR\s*,\s*,\s*UpperFilters\s*,\s*0x00010008\s*,\s*"Rc901aHidFilter"\s*$'
+        $content | Should Match '(?im)^\s*HKR\s*,\s*,\s*LowerFilterLevels\s*,\s*0x00010000\s*,\s*"Rc901aCapture"\s*,\s*"Default"\s*$'
+        $content | Should Match '(?im)^\s*HKR\s*,\s*,\s*LowerFilterDefaultLevel\s*,\s*,\s*"Default"\s*$'
+        $content | Should Match '(?im)^\s*AddFilter\s*=\s*Rc901aHidFilter\s*,\s*,\s*Rc901aHidFilter\.LowerFilter\s*$'
+        $content | Should Match '(?im)^\s*FilterLevel\s*=\s*Rc901aCapture\s*$'
+        $content | Should Not Match '(?im)^\s*HKR\s*,\s*,\s*(?:UpperFilters|LowerFilters)\s*,.*Rc901aHidFilter'
         $content | Should Match '(?im)^\s*ExcludeFromSelect\s*=\s*\*\s*$'
         $content | Should Match '(?im)^\s*PnpLockdown\s*=\s*1\s*$'
     }

@@ -90,6 +90,7 @@ Rc901aEvtDeviceAdd(
     context->DescriptorLength = 0U;
     context->CaptureStatus = Rc901aCaptureEmpty;
     context->ObservedRequestCount = 0U;
+    context->ObservedStoredCount = 0U;
     context->LastMajorFunction = 0U;
     context->LastIoControlCode = 0U;
     context->CompletionCount = 0U;
@@ -134,6 +135,15 @@ Rc901aEvtWdmIrpPreprocess(
     deviceContext = Rc901aGetDeviceContext(Device);
     WdfSpinLockAcquire(deviceContext->CaptureLock);
     deviceContext->ObservedRequestCount += 1U;
+    if (deviceContext->ObservedStoredCount < RC901A_MAX_OBSERVED_REQUESTS) {
+        ULONG observedIndex;
+
+        observedIndex = deviceContext->ObservedStoredCount;
+        deviceContext->ObservedMajorFunctions[observedIndex] = (ULONG)stack->MajorFunction;
+        deviceContext->ObservedIoControlCodes[observedIndex] =
+            stack->Parameters.DeviceIoControl.IoControlCode;
+        deviceContext->ObservedStoredCount += 1U;
+    }
     deviceContext->LastMajorFunction = (ULONG)stack->MajorFunction;
     deviceContext->LastIoControlCode = stack->Parameters.DeviceIoControl.IoControlCode;
     (void)InterlockedIncrement(&deviceContext->CaptureGeneration);
@@ -223,6 +233,9 @@ Rc901aEvtPersistCapture(
     size_t descriptorLength;
     RC901A_CAPTURE_RESULT captureStatus;
     ULONG observedRequestCount;
+    ULONG observedStoredCount;
+    ULONG observedMajorFunctions[RC901A_MAX_OBSERVED_REQUESTS];
+    ULONG observedIoControlCodes[RC901A_MAX_OBSERVED_REQUESTS];
     ULONG lastMajorFunction;
     ULONG lastIoControlCode;
     ULONG completionCount;
@@ -235,6 +248,8 @@ Rc901aEvtPersistCapture(
     DECLARE_CONST_UNICODE_STRING(digestName, L"Rc901aCapturedReportDescriptorSha256");
     DECLARE_CONST_UNICODE_STRING(statusName, L"Rc901aCaptureStatus");
     DECLARE_CONST_UNICODE_STRING(requestCountName, L"Rc901aObservedRequestCount");
+    DECLARE_CONST_UNICODE_STRING(majorFunctionsName, L"Rc901aObservedMajorFunctions");
+    DECLARE_CONST_UNICODE_STRING(ioControlCodesName, L"Rc901aObservedIoControlCodes");
     DECLARE_CONST_UNICODE_STRING(majorFunctionName, L"Rc901aLastMajorFunction");
     DECLARE_CONST_UNICODE_STRING(ioControlCodeName, L"Rc901aLastIoControlCode");
     DECLARE_CONST_UNICODE_STRING(completionCountName, L"Rc901aCompletionCount");
@@ -257,6 +272,19 @@ Rc901aEvtPersistCapture(
     descriptorLength = context->DescriptorLength;
     captureStatus = context->CaptureStatus;
     observedRequestCount = context->ObservedRequestCount;
+    observedStoredCount = context->ObservedStoredCount;
+    if (observedStoredCount > 0U) {
+        RtlCopyMemory(
+            observedMajorFunctions,
+            context->ObservedMajorFunctions,
+            observedStoredCount * sizeof(ULONG)
+            );
+        RtlCopyMemory(
+            observedIoControlCodes,
+            context->ObservedIoControlCodes,
+            observedStoredCount * sizeof(ULONG)
+            );
+    }
     lastMajorFunction = context->LastMajorFunction;
     lastIoControlCode = context->LastIoControlCode;
     completionCount = context->CompletionCount;
@@ -278,6 +306,22 @@ Rc901aEvtPersistCapture(
         (void)WdfRegistryAssignULong(captureKey, &statusName, (ULONG)captureStatus);
         (void)WdfRegistryAssignULong(captureKey, &lengthName, (ULONG)descriptorLength);
         (void)WdfRegistryAssignULong(captureKey, &requestCountName, observedRequestCount);
+        if (observedStoredCount > 0U) {
+            (void)WdfRegistryAssignValue(
+                captureKey,
+                &majorFunctionsName,
+                REG_BINARY,
+                (ULONG)(observedStoredCount * sizeof(ULONG)),
+                observedMajorFunctions
+                );
+            (void)WdfRegistryAssignValue(
+                captureKey,
+                &ioControlCodesName,
+                REG_BINARY,
+                (ULONG)(observedStoredCount * sizeof(ULONG)),
+                observedIoControlCodes
+                );
+        }
         (void)WdfRegistryAssignULong(captureKey, &majorFunctionName, lastMajorFunction);
         (void)WdfRegistryAssignULong(captureKey, &ioControlCodeName, lastIoControlCode);
         (void)WdfRegistryAssignULong(captureKey, &completionCountName, completionCount);

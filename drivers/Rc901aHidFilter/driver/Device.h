@@ -5,6 +5,8 @@
 
 #include "DescriptorCapture.h"
 
+#define RC901A_MAX_OBSERVED_REQUESTS 32U
+
 typedef struct _RC901A_DEVICE_CONTEXT {
     WDFSPINLOCK CaptureLock;
     WDFWORKITEM PersistWorkItem;
@@ -12,6 +14,9 @@ typedef struct _RC901A_DEVICE_CONTEXT {
     size_t DescriptorLength;
     RC901A_CAPTURE_RESULT CaptureStatus;
     ULONG ObservedRequestCount;
+    ULONG ObservedStoredCount;
+    ULONG ObservedMajorFunctions[RC901A_MAX_OBSERVED_REQUESTS];
+    ULONG ObservedIoControlCodes[RC901A_MAX_OBSERVED_REQUESTS];
     ULONG LastMajorFunction;
     ULONG LastIoControlCode;
     ULONG CompletionCount;
