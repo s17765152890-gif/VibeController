@@ -35,20 +35,28 @@ function Get-PnpXmlPropertyData {
     })
 }
 
-function Get-Rc901aDriverState {
+function Get-Rc901aPnpEnumerationArguments {
     [CmdletBinding()]
     param(
         [string]$DeviceInstanceId
     )
 
     $arguments = @('/enum-devices')
-    if ($DeviceInstanceId) {
-        $arguments += @('/instanceid', $DeviceInstanceId)
+    if ([string]::IsNullOrWhiteSpace($DeviceInstanceId)) {
+        $arguments += '/connected'
     }
-    else {
-        $arguments += @('/connected', '/class', 'Bluetooth')
-    }
-    $arguments += @('/deviceids', '/drivers', '/stack', '/properties', '/format', 'xml')
+    $arguments += @('/class', 'HIDClass', '/deviceids', '/drivers', '/stack', '/properties', '/format', 'xml')
+
+    return $arguments
+}
+
+function Get-Rc901aDriverState {
+    [CmdletBinding()]
+    param(
+        [string]$DeviceInstanceId
+    )
+
+    $arguments = @(Get-Rc901aPnpEnumerationArguments -DeviceInstanceId $DeviceInstanceId)
 
     $xmlText = (& pnputil.exe @arguments | Out-String)
     if ($LASTEXITCODE -ne 0) {

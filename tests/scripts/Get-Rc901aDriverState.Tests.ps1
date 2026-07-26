@@ -22,3 +22,23 @@ Describe 'Test-Rc901aHardwareId' {
         }
     }
 }
+
+Describe 'Get-Rc901aPnpEnumerationArguments' {
+    It 'discovers the connected RC901A through its HID class' {
+        $arguments = @(Get-Rc901aPnpEnumerationArguments)
+
+        ($arguments -contains '/connected') | Should Be $true
+        ($arguments -contains '/class') | Should Be $true
+        ($arguments -contains 'HIDClass') | Should Be $true
+        ($arguments -contains 'Bluetooth') | Should Be $false
+    }
+
+    It 'avoids the malformed pnputil instance query while filtering an explicit instance in memory' {
+        $arguments = @(Get-Rc901aPnpEnumerationArguments -DeviceInstanceId 'BTHLEDevice\exact-instance')
+
+        ($arguments -contains '/class') | Should Be $true
+        ($arguments -contains 'HIDClass') | Should Be $true
+        ($arguments -contains '/instanceid') | Should Be $false
+        ($arguments -contains '/connected') | Should Be $false
+    }
+}
