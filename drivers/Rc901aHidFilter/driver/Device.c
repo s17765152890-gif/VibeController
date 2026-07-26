@@ -14,20 +14,19 @@ Rc901aPersistAttachMarker(
     _In_ WDFDEVICE Device
     )
 {
-    WDFKEY deviceKey;
+    WDFKEY captureKey;
     NTSTATUS status;
     DECLARE_CONST_UNICODE_STRING(attachedName, L"Rc901aFilterAttached");
 
-    status = WdfDeviceOpenRegistryKey(
-        Device,
-        PLUGPLAY_REGKEY_DEVICE,
+    status = WdfDriverOpenParametersRegistryKey(
+        WdfDeviceGetDriver(Device),
         KEY_SET_VALUE,
         WDF_NO_OBJECT_ATTRIBUTES,
-        &deviceKey
+        &captureKey
         );
     if (NT_SUCCESS(status)) {
-        (void)WdfRegistryAssignULong(deviceKey, &attachedName, 1U);
-        WdfRegistryClose(deviceKey);
+        (void)WdfRegistryAssignULong(captureKey, &attachedName, 1U);
+        WdfRegistryClose(captureKey);
     }
 }
 
@@ -218,7 +217,7 @@ Rc901aEvtPersistCapture(
 {
     WDFDEVICE device;
     PRC901A_DEVICE_CONTEXT context;
-    WDFKEY deviceKey;
+    WDFKEY captureKey;
     unsigned char* descriptor;
     unsigned char digest[RC901A_SHA256_DIGEST_SIZE];
     size_t descriptorLength;
@@ -269,43 +268,42 @@ Rc901aEvtPersistCapture(
     }
     WdfSpinLockRelease(context->CaptureLock);
 
-    status = WdfDeviceOpenRegistryKey(
-        device,
-        PLUGPLAY_REGKEY_DEVICE,
+    status = WdfDriverOpenParametersRegistryKey(
+        WdfDeviceGetDriver(device),
         KEY_SET_VALUE,
         WDF_NO_OBJECT_ATTRIBUTES,
-        &deviceKey
+        &captureKey
         );
     if (NT_SUCCESS(status)) {
-        (void)WdfRegistryAssignULong(deviceKey, &statusName, (ULONG)captureStatus);
-        (void)WdfRegistryAssignULong(deviceKey, &lengthName, (ULONG)descriptorLength);
-        (void)WdfRegistryAssignULong(deviceKey, &requestCountName, observedRequestCount);
-        (void)WdfRegistryAssignULong(deviceKey, &majorFunctionName, lastMajorFunction);
-        (void)WdfRegistryAssignULong(deviceKey, &ioControlCodeName, lastIoControlCode);
-        (void)WdfRegistryAssignULong(deviceKey, &completionCountName, completionCount);
-        (void)WdfRegistryAssignULong(deviceKey, &completionStatusName, (ULONG)lastCompletionStatus);
-        (void)WdfRegistryAssignULong(deviceKey, &completionInformationName, lastCompletionInformation);
+        (void)WdfRegistryAssignULong(captureKey, &statusName, (ULONG)captureStatus);
+        (void)WdfRegistryAssignULong(captureKey, &lengthName, (ULONG)descriptorLength);
+        (void)WdfRegistryAssignULong(captureKey, &requestCountName, observedRequestCount);
+        (void)WdfRegistryAssignULong(captureKey, &majorFunctionName, lastMajorFunction);
+        (void)WdfRegistryAssignULong(captureKey, &ioControlCodeName, lastIoControlCode);
+        (void)WdfRegistryAssignULong(captureKey, &completionCountName, completionCount);
+        (void)WdfRegistryAssignULong(captureKey, &completionStatusName, (ULONG)lastCompletionStatus);
+        (void)WdfRegistryAssignULong(captureKey, &completionInformationName, lastCompletionInformation);
 
         if (captureStatus == Rc901aCaptureSuccess &&
             descriptorLength > 0U &&
             Rc901aComputeSha256(descriptor, descriptorLength, digest) != 0) {
             (void)WdfRegistryAssignValue(
-                deviceKey,
+                captureKey,
                 &descriptorName,
                 REG_BINARY,
                 (ULONG)descriptorLength,
                 descriptor
-                );
+            );
             (void)WdfRegistryAssignValue(
-                deviceKey,
+                captureKey,
                 &digestName,
                 REG_BINARY,
                 RC901A_SHA256_DIGEST_SIZE,
                 digest
-                );
+            );
         }
 
-        WdfRegistryClose(deviceKey);
+        WdfRegistryClose(captureKey);
     }
 
     ExFreePoolWithTag(descriptor, RC901A_CAPTURE_POOL_TAG);

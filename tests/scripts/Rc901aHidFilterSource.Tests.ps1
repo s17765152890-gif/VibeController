@@ -18,6 +18,8 @@ Describe 'RC901A KMDF IRP forwarding contract' {
     It 'persists attach request and completion diagnostics beside the captured descriptor' {
         $content = Get-Content -LiteralPath $sourcePath -Raw
 
+        $content | Should Match 'WdfDriverOpenParametersRegistryKey'
+        $content | Should Not Match 'PLUGPLAY_REGKEY_DEVICE'
         $content | Should Match 'Rc901aFilterAttached'
         $content | Should Match 'Rc901aObservedRequestCount'
         $content | Should Match 'Rc901aLastMajorFunction'
