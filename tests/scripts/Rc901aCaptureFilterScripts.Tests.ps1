@@ -78,7 +78,8 @@ if ((Test-Path -LiteralPath $installScript) -and (Test-Path -LiteralPath $uninst
         It 'accepts the lowercase catalog filename emitted by the WDK' {
             $packageDirectory = Join-Path $TestDrive 'package'
             New-Item -ItemType Directory -Path $packageDirectory | Out-Null
-            New-Item -ItemType File -Path (Join-Path $packageDirectory 'Rc901aHidFilter.inf') | Out-Null
+            'ServiceBinary = %13%\Rc901aHidFilter.sys' |
+                Set-Content -LiteralPath (Join-Path $packageDirectory 'Rc901aHidFilter.inf')
             New-Item -ItemType File -Path (Join-Path $packageDirectory 'rc901ahidfilter.cat') | Out-Null
             New-Item -ItemType File -Path (Join-Path $packageDirectory 'Rc901aHidFilter.sys') | Out-Null
             Mock Get-AuthenticodeSignature {
@@ -89,6 +90,35 @@ if ((Test-Path -LiteralPath $installScript) -and (Test-Path -LiteralPath $uninst
 
             [System.IO.Path]::GetFileName($package.CatalogPath) | Should Be 'rc901ahidfilter.cat'
             $package.CatalogSignatureStatus | Should Be 'NotSigned'
+        }
+
+        It 'accepts the UMDF DLL referenced by the INF without requiring the retired SYS' {
+            $packageDirectory = Join-Path $TestDrive 'umdf-package'
+            New-Item -ItemType Directory -Path $packageDirectory | Out-Null
+            'ServiceBinary = "%13%\Rc901aUmdfCapture.dll"' |
+                Set-Content -LiteralPath (Join-Path $packageDirectory 'Rc901aHidFilter.inf')
+            New-Item -ItemType File -Path (Join-Path $packageDirectory 'Rc901aHidFilter.cat') | Out-Null
+            New-Item -ItemType File -Path (Join-Path $packageDirectory 'Rc901aUmdfCapture.dll') | Out-Null
+            Mock Get-AuthenticodeSignature {
+                [pscustomobject]@{ Status = 'Valid'; SignerCertificate = [pscustomobject]@{ Subject = 'CN=Test' } }
+            }
+
+            $package = Get-Rc901aCapturePackage -Directory $packageDirectory
+
+            [System.IO.Path]::GetFileName($package.BinaryPath) | Should Be 'Rc901aUmdfCapture.dll'
+            $package.BinaryKind | Should Be 'UMDF'
+            $package.CatalogSignatureStatus | Should Be 'Valid'
+        }
+
+        It 'refuses a binary that is present but not referenced by the exact INF' {
+            $packageDirectory = Join-Path $TestDrive 'mismatched-package'
+            New-Item -ItemType Directory -Path $packageDirectory | Out-Null
+            'ServiceBinary = "%13%\Expected.dll"' |
+                Set-Content -LiteralPath (Join-Path $packageDirectory 'Rc901aHidFilter.inf')
+            New-Item -ItemType File -Path (Join-Path $packageDirectory 'Rc901aHidFilter.cat') | Out-Null
+            New-Item -ItemType File -Path (Join-Path $packageDirectory 'Unexpected.dll') | Out-Null
+
+            { Get-Rc901aCapturePackage -Directory $packageDirectory } | Should Throw
         }
     }
 
@@ -121,6 +151,17 @@ if ((Test-Path -LiteralPath $installScript) -and (Test-Path -LiteralPath $uninst
             $preview.WillMutate | Should Be $false
             Test-Path -LiteralPath $statePath | Should Be $false
             Assert-MockCalled Invoke-Rc901aPnpUtilMutation -Times 0
+        }
+
+        It 'stages and records the OEM package before binding it to the device' {
+            $content = Get-Content -LiteralPath $installScript -Raw
+            $stageIndex = $content.IndexOf("@('/add-driver', `$package.InfPath)")
+            $recordIndex = $content.IndexOf('$stateRecord.Package.PublishedName = $published.PublishedName')
+            $bindIndex = $content.IndexOf("@('/add-driver', `$package.InfPath, '/install')")
+
+            ($stageIndex -ge 0) | Should Be $true
+            ($recordIndex -gt $stageIndex) | Should Be $true
+            ($bindIndex -gt $recordIndex) | Should Be $true
         }
     }
 

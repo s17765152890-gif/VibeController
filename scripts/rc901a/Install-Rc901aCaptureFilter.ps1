@@ -10,7 +10,7 @@ param(
 Set-StrictMode -Version Latest
 
 if ([string]::IsNullOrWhiteSpace($PackageDirectory)) {
-    $PackageDirectory = Join-Path $PSScriptRoot '..\..\drivers\Rc901aHidFilter\driver\x64\Debug\Rc901aHidFilter'
+    $PackageDirectory = Join-Path $PSScriptRoot '..\..\drivers\Rc901aHidFilter\umdf\bin\x64\Debug\Rc901aUmdfCapture'
 }
 if ([string]::IsNullOrWhiteSpace($StatePath)) {
     $StatePath = Join-Path $PSScriptRoot '..\..\artifacts\rc901a-driver-state-before.json'
@@ -106,17 +106,38 @@ function Get-Rc901aCapturePackage {
     $resolvedDirectory = (Resolve-Path -LiteralPath $Directory -ErrorAction Stop).Path
     $infFiles = @(Get-ChildItem -LiteralPath $resolvedDirectory -Filter 'Rc901aHidFilter.inf' -File)
     $catalogFiles = @(Get-ChildItem -LiteralPath $resolvedDirectory -Filter 'Rc901aHidFilter.cat' -File)
-    $driverFiles = @(Get-ChildItem -LiteralPath $resolvedDirectory -Filter 'Rc901aHidFilter.sys' -File)
-    if ($infFiles.Count -ne 1 -or $catalogFiles.Count -ne 1 -or $driverFiles.Count -ne 1) {
-        throw 'The package directory must contain exactly one RC901A INF, catalog, and SYS file.'
+    if ($infFiles.Count -ne 1 -or $catalogFiles.Count -ne 1) {
+        throw 'The package directory must contain exactly one RC901A INF and catalog.'
+    }
+
+    $infContent = Get-Content -LiteralPath $infFiles[0].FullName -Raw
+    $binaryMatches = @([regex]::Matches(
+        $infContent,
+        '(?im)^\s*ServiceBinary\s*=\s*"?%13%\\([^"\r\n]+\.(?:sys|dll))"?\s*$'
+    ))
+    $binaryNames = @($binaryMatches |
+        ForEach-Object { $_.Groups[1].Value } |
+        Select-Object -Unique)
+    if ($binaryNames.Count -ne 1 -or
+        [IO.Path]::GetFileName($binaryNames[0]) -ine $binaryNames[0]) {
+        throw 'The exact RC901A INF must reference one driver-store SYS or DLL binary.'
+    }
+
+    $binaryFiles = @(Get-ChildItem -LiteralPath $resolvedDirectory -File |
+        Where-Object { $_.Name -ieq $binaryNames[0] })
+    if ($binaryFiles.Count -ne 1) {
+        throw "The package must contain exactly one INF-referenced binary named '$($binaryNames[0])'."
     }
 
     $signature = Get-AuthenticodeSignature -LiteralPath $catalogFiles[0].FullName
+    $binaryKind = if ($binaryFiles[0].Extension -ieq '.dll') { 'UMDF' } else { 'KMDF' }
     [pscustomobject]@{
         Directory = $resolvedDirectory
         InfPath = $infFiles[0].FullName
         CatalogPath = $catalogFiles[0].FullName
-        DriverPath = $driverFiles[0].FullName
+        BinaryPath = $binaryFiles[0].FullName
+        BinaryKind = $binaryKind
+        DriverPath = $binaryFiles[0].FullName
         CatalogSignatureStatus = [string]$signature.Status
         CatalogSigner = if ($null -ne $signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { $null }
     }
@@ -149,7 +170,7 @@ function Invoke-Rc901aPnpUtilMutation {
     return $output
 }
 
-function Get-Rc901aPublishedDriver {
+function Get-Rc901aPublishedDrivers {
     [CmdletBinding()]
     param()
 
@@ -162,17 +183,36 @@ function Get-Rc901aPublishedDriver {
     $matches = @($document.PnpUtil.Driver | Where-Object {
         $_.OriginalName -ieq 'rc901ahidfilter.inf' -and $_.ProviderName -ieq 'VibeController'
     })
-    if ($matches.Count -ne 1) {
-        throw "Expected one published RC901A filter package, found $($matches.Count)."
+
+    foreach ($match in $matches) {
+        [pscustomobject]@{
+            PublishedName = [string]$match.DriverName
+            OriginalName = [string]$match.OriginalName
+            ProviderName = [string]$match.ProviderName
+            DriverVersion = [string]$match.DriverVersion
+            SignerName = [string]$match.SignerName
+        }
+    }
+}
+
+function Resolve-Rc901aNewPublishedDriver {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory)]
+        [AllowEmptyCollection()]
+        [psobject[]]$BeforeDrivers
+    )
+
+    $beforeNames = @($BeforeDrivers | ForEach-Object { [string]$_.PublishedName })
+    $afterDrivers = @(Get-Rc901aPublishedDrivers)
+    $newDrivers = @($afterDrivers | Where-Object {
+        $beforeNames -inotcontains [string]$_.PublishedName
+    })
+    if ($newDrivers.Count -ne 1) {
+        throw "Expected staging to publish exactly one new RC901A package, found $($newDrivers.Count)."
     }
 
-    [pscustomobject]@{
-        PublishedName = [string]$matches[0].DriverName
-        OriginalName = [string]$matches[0].OriginalName
-        ProviderName = [string]$matches[0].ProviderName
-        DriverVersion = [string]$matches[0].DriverVersion
-        SignerName = [string]$matches[0].SignerName
-    }
+    return $newDrivers[0]
 }
 
 function Invoke-Rc901aCaptureFilterInstall {
@@ -227,17 +267,27 @@ function Invoke-Rc901aCaptureFilterInstall {
 
     $device = Get-Rc901aExactDeviceState -DeviceInstanceId $device.InstanceId
     if ($PSCmdlet.ShouldProcess($device.InstanceId, "Install trusted RC901A capture filter from $($package.InfPath)")) {
-        $installOutput = Invoke-Rc901aPnpUtilMutation -Arguments @('/add-driver', $package.InfPath, '/install')
-        $published = Get-Rc901aPublishedDriver
+        $beforeDrivers = @(Get-Rc901aPublishedDrivers)
+        $stageOutput = Invoke-Rc901aPnpUtilMutation -Arguments @('/add-driver', $package.InfPath)
+        $published = Resolve-Rc901aNewPublishedDriver -BeforeDrivers $beforeDrivers
         $stateRecord.Package.PublishedName = $published.PublishedName
         $stateRecord.Package.DriverVersion = $published.DriverVersion
         $stateRecord.Package.SignerName = $published.SignerName
+        $stateRecord.Package.StagedAtUtc = [DateTime]::UtcNow.ToString('o')
         $stateRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $RollbackStatePath -Encoding UTF8
+
+        $installOutput = Invoke-Rc901aPnpUtilMutation -Arguments @('/add-driver', $package.InfPath, '/install')
+        $activeDevice = Get-Rc901aExactDeviceState -DeviceInstanceId $device.InstanceId
+        if ($activeDevice.DriverInf -ine $published.PublishedName) {
+            throw "The staged package is rollback-ready, but the exact RC901A device did not bind to $($published.PublishedName)."
+        }
 
         [pscustomobject]@{
             Plan = $plan
             PublishedDriver = $published
+            StageOutput = $stageOutput
             PnpUtilOutput = $installOutput
+            ActiveDevice = $activeDevice
         }
     }
 }

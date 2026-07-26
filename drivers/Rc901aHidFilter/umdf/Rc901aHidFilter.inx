@@ -1,0 +1,61 @@
+[Version]
+Signature = "$WINDOWS NT$"
+Class = HIDClass
+ClassGuid = {745a17a0-74d3-11d0-b6fe-00a0c90f57da}
+Provider = %ProviderName%
+CatalogFile = Rc901aHidFilter.cat
+DriverVer = 07/26/2026,1.0.0.0
+PnpLockdown = 1
+
+[ControlFlags]
+ExcludeFromSelect = *
+
+[DestinationDirs]
+Rc901aUmdfCapture.CopyFiles = 13
+
+[SourceDisksNames]
+1 = %DiskName%,,,
+
+[SourceDisksFiles]
+Rc901aUmdfCapture.dll = 1
+
+[Rc901aUmdfCapture.CopyFiles]
+Rc901aUmdfCapture.dll
+
+[Manufacturer]
+%ProviderName% = Rc901aModels,NTamd64.10.0...19041
+
+[Rc901aModels.NTamd64.10.0...19041]
+%Rc901aDeviceDescription% = Rc901aCapture_Install, BTHLEDevice\{00001812-0000-1000-8000-00805f9b34fb}_Dev_VID&010416_PID&0301_REV&0003
+
+[Rc901aCapture_Install.NT]
+Include = hidbthle.inf
+Needs = HidBthLE.NT
+CopyFiles = Rc901aUmdfCapture.CopyFiles
+
+[Rc901aCapture_Install.NT.hw]
+Include = hidbthle.inf
+Needs = HidBthLE.NT.hw
+
+[Rc901aCapture_Install.NT.Services]
+Include = hidbthle.inf
+Needs = HidBthLE.NT.Services
+
+[Rc901aCapture_Install.NT.Wdf]
+Include = hidbthle.inf
+Needs = HidBthLE.NT.Wdf
+UmdfService = Rc901aUmdfCapture, Rc901aUmdfCapture.Wdf
+UmdfServiceOrder = HidOverGatt, Rc901aUmdfCapture
+
+[Rc901aUmdfCapture.Wdf]
+UmdfLibraryVersion = $UMDFVERSION$
+ServiceBinary = "%13%\Rc901aUmdfCapture.dll"
+
+[Rc901aCapture_Install.NT.CoInstallers]
+Include = hidbthle.inf
+Needs = HidBthLE.NT.CoInstallers
+
+[Strings]
+ProviderName = "VibeController"
+DiskName = "VibeController RC901A report-map capture filter"
+Rc901aDeviceDescription = "TCL RC901A report-map capture filter"

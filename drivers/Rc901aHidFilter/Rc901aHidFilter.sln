@@ -6,6 +6,8 @@ Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "Rc901aHidFilter", "driver\R
 EndProject
 Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "DescriptorCaptureTests", "tests\DescriptorCaptureTests.vcxproj", "{50604076-42F2-4F3F-AE34-02F0E1E5414D}"
 EndProject
+Project("{BC8A1FFA-BEE3-4634-8014-F334798102B3}") = "Rc901aUmdfCapture", "umdf\Rc901aUmdfCapture.vcxproj", "{644A8F6C-B866-4D91-A3DC-074B20B62625}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -20,5 +22,9 @@ Global
 		{50604076-42F2-4F3F-AE34-02F0E1E5414D}.Debug|x64.Build.0 = Debug|x64
 		{50604076-42F2-4F3F-AE34-02F0E1E5414D}.Release|x64.ActiveCfg = Release|x64
 		{50604076-42F2-4F3F-AE34-02F0E1E5414D}.Release|x64.Build.0 = Release|x64
+		{644A8F6C-B866-4D91-A3DC-074B20B62625}.Debug|x64.ActiveCfg = Debug|x64
+		{644A8F6C-B866-4D91-A3DC-074B20B62625}.Debug|x64.Build.0 = Debug|x64
+		{644A8F6C-B866-4D91-A3DC-074B20B62625}.Release|x64.ActiveCfg = Release|x64
+		{644A8F6C-B866-4D91-A3DC-074B20B62625}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 EndGlobal
