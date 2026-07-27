@@ -179,7 +179,7 @@ describe("Dashboard", () => {
 
     const disconnectedCard = container.querySelector('.controller-card[data-disconnected="true"]');
     expect(disconnectedCard).toContainElement(screen.getByTestId("tcl-remote-visual"));
-    expect(globalStyles).toContain(
+    expect(globalStyles.replace(/\r\n/g, "\n")).toContain(
       '.controller-card[data-disconnected="true"] .controller-photo-stage,\n.controller-card[data-disconnected="true"] .tcl-remote-stage {',
     );
   });
