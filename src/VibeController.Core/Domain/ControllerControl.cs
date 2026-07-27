@@ -55,4 +55,12 @@ public enum ControllerControl
     RemoteDigit7,
     RemoteDigit8,
     RemoteDigit9,
+    RemotePower,
+    RemoteInput,
+    RemoteRed,
+    RemoteGreen,
+    RemoteBlue,
+    RemoteSettings,
+    RemoteApp1,
+    RemoteApp2,
 }
