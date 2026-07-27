@@ -24,7 +24,7 @@ VibeController 是一款面向 Windows 的开源桌面工具。它读取 Xbox Se
 ### 功能亮点
 
 - 支持 Xbox Wireless Controller（XInput，控制器 1–4）和 PS5 DualSense（USB / 蓝牙 HID）。
-- 实验性支持 TCL BT_RC901A_B1：即使 Windows 的通用 HID 子驱动报错，也可通过专用 BLE GATT 后端读取连接状态、电量和原始通知。
+- 实验性支持 TCL BT_RC901A_B1：固件 `V1.0.192.6` 已完成 22 个非电源键实机验收，默认自动识别；高级学习模式用于兼容其他固件。
 - Codex 语义动作不是写死的快捷键：首次触发时读取 Codex 当前快捷键，并在配置变化后自动刷新。
 - 支持听写、发送、命令菜单、任务/最近任务/标签页切换和推理强度调节。
 - 左摇杆移动鼠标，扳机键点击；DualSense 触控板移动鼠标，按下执行左键单击。
@@ -35,15 +35,15 @@ VibeController 是一款面向 Windows 的开源桌面工具。它读取 Xbox Se
 - 默认只在 Codex 位于前台时注入输入，另有暂停映射和无注入测试模式。
 - 本地 JSON 配置、系统托盘、自动重连和开机启动选项。
 
-### TCL RC901A 实验性直连
+### TCL RC901A 实验性支持
 
-当前源码包含 BT_RC901A_B1 的专用 BLE 后端、设备切换界面、遥控器示意图、默认动作配置和原始数据检查器；已发布的 v1.1.0 二进制尚不包含该功能。RC901A 的逻辑按键解释器默认保持空白，必须先从实体遥控器采集并验证每个按键的真实数据包，项目不会猜测厂商协议。
+当前源码包含 BT_RC901A_B1 的专用输入后端、设备切换界面、遥控器示意图、默认动作配置和原始数据检查器；已发布的 v1.1.0 二进制尚不包含该功能。固件 `V1.0.192.6` 的方向、确认、返回、菜单、音量、彩色键、应用键、麦克风键和三个侧键等 22 个非电源键已经过实体遥控器逐键验证，连接后会自动加载默认按键表，无需逐键学习。学习模式保留在高级兼容区域，用于固件差异或用户主动覆盖。
 
-Windows 可能为该遥控器显示“驱动程序错误”。已确认这是 Windows 通用 BLE HID 驱动无法解析遥控器固件中的 HID 报告描述符，不代表整个蓝牙设备不可用。VibeController 会绕过失败的 HID 子驱动，直接检查标准 HID 服务和 TCL 的 D0FF/D1FF GATT 通知服务。
+Windows 可能为该遥控器显示“驱动程序错误”。已确认这是 Windows 通用 BLE HID 驱动无法解析遥控器固件中的 HID 报告描述符，不代表整个蓝牙设备不可用。实验分支使用只绑定该型号精确硬件 ID 的兼容驱动修复描述符并采集输入；应用优先读取驱动快照，在 HID 设备栈拦截私有请求时使用同一驱动写出的只读兼容快照。直接 BLE 检查器仍保留作诊断；专用驱动不可用时，运行时仅回退到 Windows 实际提供的标准按键输入。
 
 如果 Windows 显示“已配对”但 VibeController 报告 `Unreachable`，通常是电脑与遥控器保存的绑定密钥不同步：先在 Windows 蓝牙设置中删除 `BT_RC901A_B1`，再靠近电脑同时长按方向键中央的 `OK + 返回键` 约 5 秒并重新配对。完整步骤和安全采集规则见 [RC901A BLE 采集指南](docs/testing/RC901A-BLE-CAPTURE.md)。
 
-该后端不会写入 TCL 厂商特征或 DFU 服务；唯一允许的写操作是 BLE 标准要求的通知订阅描述符。Mic 键目前只能映射为 Codex 原生听写快捷键，遥控器麦克风音频尚未接入。
+专用驱动仅绑定 VID `0416`、PID `0301`、修订版 `0003`，不会影响 Xbox、DualSense 或通用 HID 设备，也不会写入 TCL 厂商特征或 DFU 服务。Mic 键可映射为 Codex 原生听写快捷键，但遥控器麦克风音频尚未接入；电源键为避免系统级副作用，当前不捕获也不映射。开发驱动仍为临时测试签名，尚未进入面向普通用户的 Release；正式发布需要 Microsoft attestation 或等效生产签名。
 
 | PS5 DualSense | 按键映射 |
 | --- | --- |
@@ -111,7 +111,7 @@ Codex 当前通常未给“切换听写”和“提高/降低推理强度”分�
 ### 工作原理
 
 ```text
-Xbox XInput / DualSense HID / RC901A Direct BLE
+Xbox XInput / DualSense HID / RC901A exact-device driver
           ↓
 统一的手柄输入事件
           ↓
@@ -152,7 +152,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test-release.ps1 -Versi
 - DualSense 的 USB/蓝牙报告解析和触控板行为已有自动化测试，但不同固件与蓝牙适配器仍需要更多实体设备反馈。
 - DualSense 灯条的 USB/蓝牙输出报告与 CRC 已有自动化测试；不同固件、蓝牙栈以及共享 HID 写权限仍需按硬件清单验收。
 - 普通 DualSense 蓝牙配对通常只提供手柄 HID，不提供麦克风音频端点；VibeController 不尝试绕过 Windows 的音频设备能力。
-- RC901A 直连仍处于实体数据包采集阶段；在签名完成前，界面可以显示连接和原始通知，但不会猜测按键动作。
+- RC901A 的 22 个非电源键已在固件 `V1.0.192.6` 上完成实机验证；其他固件仍可能需要高级学习模式。专用驱动尚未取得生产签名，因此不会随当前 Release 分发。
 - 未来计划包括配置档案、组合/长按动作以及更多通用 HID 设备。
 
 ### 许可证与声明
@@ -171,7 +171,7 @@ VibeController is an open-source Windows desktop utility that turns input from X
 
 - Xbox Wireless Controller support through XInput (controller slots 1–4).
 - PS5 DualSense support through native Windows USB/Bluetooth HID, including the touchpad.
-- Experimental TCL BT_RC901A_B1 support through a dedicated BLE GATT backend, independent of the failed generic Windows HID child driver.
+- Experimental TCL BT_RC901A_B1 support with a hardware-verified 22-button profile for firmware `V1.0.192.6`; advanced learning remains available for other firmware.
 - Codex semantic actions resolve the user's current Codex shortcuts on first use and refresh after the file changes—no universal hard-coded shortcut assumptions.
 - Dictation, submit, command menu, thread/recent-thread/tab navigation, and reasoning-effort actions.
 - Left stick mouse movement, trigger clicks, right-stick arrow-key repeat, and DualSense touchpad mouse control.
@@ -181,15 +181,15 @@ VibeController is an open-source Windows desktop utility that turns input from X
 - Codex-foreground guard by default, plus pause and non-injecting input-test modes.
 - Local JSON settings, system tray behavior, device reconnect, and optional start with Windows.
 
-### Experimental TCL RC901A direct BLE
+### Experimental TCL RC901A support
 
-The current source tree includes a dedicated BT_RC901A_B1 backend, device picker, remote visual, default action profile, and raw-notification inspector. The published v1.1.0 binaries do not include it yet. The logical report registry intentionally starts empty: physical button signatures must be captured and verified before the project assigns meanings to vendor packets.
+The current source tree includes a dedicated BT_RC901A_B1 input backend, device picker, remote visual, default action profile, and raw-notification inspector. The published v1.1.0 binaries do not include it yet. Twenty-two non-power buttons—including navigation, OK, Back, Menu, volume, color, app, microphone, and the three side buttons—were physically verified on firmware `V1.0.192.6`. That profile loads automatically; per-button learning is now an advanced compatibility override for firmware variants.
 
-Windows may show “Driver error” for this remote. Hardware probing confirmed that the generic BLE HID child driver rejects the firmware's HID report descriptor; that does not make the complete BLE device unusable. VibeController bypasses that child driver and inspects the standard HID plus TCL D0FF/D1FF notification services directly.
+Windows may show “Driver error” for this remote. Hardware probing confirmed that the generic BLE HID child driver rejects the firmware's HID report descriptor; that does not make the complete BLE device unusable. The experimental branch uses an exact-hardware-ID compatibility driver to repair the descriptor and capture input. The app prefers the driver's private snapshot interface and uses the same driver's read-only compatibility snapshot when the HID stack blocks private requests. Direct BLE inspection remains available for diagnostics; when the driver channel is unavailable, the runtime falls back only to standard key input that Windows actually exposes.
 
 If Windows says the remote is paired while VibeController reports `Unreachable`, remove `BT_RC901A_B1` from Windows Bluetooth settings, hold the center D-pad `OK + Back` buttons near the computer for about five seconds, and pair it again. This repairs stale bond keys. See the [RC901A BLE capture guide](docs/testing/RC901A-BLE-CAPTURE.md) for the full safe workflow.
 
-The backend never writes TCL vendor characteristics or the DFU service. Its only permitted write is the standard BLE notification-subscription descriptor. The Mic button can trigger Codex native dictation, but remote microphone audio is not supported yet.
+The driver binds only VID `0416`, PID `0301`, revision `0003`; it does not affect Xbox, DualSense, or generic HID devices and never writes TCL vendor characteristics or the DFU service. The Mic button can trigger Codex native dictation, but remote microphone audio is not supported. The Power button is intentionally neither captured nor mapped. The development package is temporarily test-signed and is not ready for end-user distribution; a public release needs Microsoft attestation or equivalent production signing.
 
 ### Download and install
 
@@ -279,7 +279,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture and pull-request guidanc
 - DualSense USB/Bluetooth parsing and touchpad behavior are covered by automated tests, while more real-world firmware and adapter reports are welcome.
 - DualSense USB/Bluetooth lightbar packets and Bluetooth CRC are covered by automated tests, but firmware, Bluetooth stacks, and shared HID write access still require physical-device acceptance.
 - Standard DualSense Bluetooth pairing normally exposes controller HID only, not its microphone audio endpoint; VibeController does not bypass Windows audio-device capabilities.
-- RC901A direct BLE is still in physical packet-capture validation. Until signatures are verified, the UI can report connection and raw notifications but will not guess button actions.
+- RC901A's 22 non-power buttons are physically verified on firmware `V1.0.192.6`; other firmware may still require advanced learning. The dedicated driver is not included in current releases until production signing is available.
 - Planned directions include profiles, chord/hold actions, and additional generic HID devices.
 
 ### License and notice

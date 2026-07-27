@@ -1,8 +1,97 @@
 # RC901A HID compatibility filter
 
-This document records the evidence and safety boundary for restoring standard Windows HID input on the TCL `BT_RC901A_B1`. Pairing already works. The remaining failure is in the HID-over-GATT interpretation layer, not Bluetooth discovery.
+This document records the evidence and safety boundary for restoring Windows input on the TCL `BT_RC901A_B1`. Bluetooth pairing works, while the inbox HID-over-GATT parser rejects this firmware's report descriptor. The current experimental driver and physical acceptance state are recorded first; earlier capture milestones remain below as history.
 
-## Observed device boundary
+## Current verified development state (2026-07-27)
+
+The development machine has completed an end-to-end input acceptance pass for RC901A firmware `V1.0.192.6`.
+
+| Field | Verified value |
+| --- | --- |
+| Driver provider | `VibeController` |
+| Driver version | `1.0.0.6` dated `07/27/2026` |
+| Installed INF | `oem182.inf` |
+| Device state | Started, problem code `0x00000000` |
+| Package used | `artifacts/rc901a-test-package-pass16-driver-channel` |
+| Private interface | `{34826b0c-f006-44e1-ae98-a584b68c4ec1}`, exactly one present endpoint |
+| Runtime probe | Parsed snapshot, `TotalReports=46`, `Records=32`, sequences `15..46` |
+
+The package remains a temporary test-signed development build. It is not included in the public release and is not an end-user installation path. Public distribution requires Microsoft attestation signing or an equivalent production-signing route.
+
+### Runtime transport
+
+The app tries the driver's private snapshot interface first. On this HID stack, normal-user `CreateFile`/private-IOCTL access is rejected before the request reaches the UMDF filter (Win32 error 31). The managed transport therefore uses a bounded compatibility path:
+
+1. enumerate the exact private interface and require it to be present;
+2. try the private IOCTL;
+3. if the upper HID stack blocks it, read the same driver-owned snapshot from the normal-user-readable UMDF Parameters key;
+4. re-enumerate the interface once per second so unplugged hardware cannot be represented indefinitely by stale registry data.
+
+The compatibility snapshot lives under:
+
+```text
+HKLM\SOFTWARE\Microsoft\Windows NT\CurrentVersion\WUDF\Services\Rc901aUmdfCapture\Parameters
+```
+
+The reader validates protocol version, record size, count, history length, total count, and the final record sequence. A partially updated registry snapshot is rejected rather than decoded. The raw-input path remains a fallback only when the driver channel is unavailable; it is suppressed while the driver channel is healthy and can recover after a disconnect.
+
+### Hardware-verified button table
+
+These report-ID-`01` HID usage bytes were observed as physical press/release pairs and are the automatic default profile for firmware `V1.0.192.6`:
+
+| Physical button | Usage byte |
+| --- | --- |
+| Up | `52` |
+| Down | `51` |
+| Left | `50` |
+| Right | `4F` |
+| OK | `28` |
+| Menu | `65` |
+| Back | `F1` |
+| Home | `83` |
+| Volume + | `ED` |
+| Volume - | `EE` |
+| Microphone | `AD` |
+| Mute | `EF` |
+| Input | `97` |
+| Red | `99` |
+| Green | `9A` |
+| Blue | `9B` |
+| Settings | `A8` |
+| bilibili | `D1` |
+| 奇异果 TV | `DE` |
+| Side brightness + | `9E` |
+| Side brightness - | `9F` |
+| Side picture mode | `AA` |
+
+The final ordered physical pass generated 44 report-ID-`01` records (22 press/release pairs) plus two report-ID-`E8` microphone auxiliary reports, for `TotalReports=46`. A deliberately inserted mouse left click between Menu and Back did not enter the RC901A stream. The first seven buttons were also verified independently before they rolled out of the 32-record ring buffer. Decoder tests confirm that the `E8` microphone auxiliary reports do not duplicate the logical `AD` microphone press/release.
+
+Power is deliberately excluded because it can have system-level effects. The microphone button is an input button only: it may trigger Codex native dictation, but the remote's microphone audio transport is not implemented. Learning mode remains available only as an advanced compatibility override for a different firmware or an intentional custom binding.
+
+### Verification and rollback evidence
+
+- Managed tests cover snapshot parsing, stale-report suppression, raw fallback, driver recovery, microphone auxiliary filtering, the verified table, and inconsistent registry writes.
+- Native descriptor/capture tests and the UMDF packaging contract pass independently of the managed suite.
+- The normal-user production transport read the live driver snapshot successfully after the physical run.
+- The pre-install rollback state is saved at `artifacts/rc901a-driver-state-before-pass16-driver-channel.json`; it records the previous `1.0.0.5` / `oem181.inf` selection.
+- The install result is saved at `artifacts/rc901a-pass16-driver-channel-result.json` and records a successful install with no automatic rollback.
+
+Preview rollback:
+
+```powershell
+.\scripts\rc901a\Uninstall-Rc901aCaptureFilter.ps1 `
+  -StatePath .\artifacts\rc901a-driver-state-before-pass16-driver-channel.json
+```
+
+Apply rollback only from a visible elevated PowerShell after reviewing the preview:
+
+```powershell
+.\scripts\rc901a\Uninstall-Rc901aCaptureFilter.ps1 `
+  -StatePath .\artifacts\rc901a-driver-state-before-pass16-driver-channel.json `
+  -Apply
+```
+
+## Exact device boundary
 
 | Field | Observed value |
 | --- | --- |
@@ -12,8 +101,8 @@ This document records the evidence and safety boundary for restoring standard Wi
 | Product ID | `0301` |
 | Product revision | `0003` |
 | Exact hardware ID | `BTHLEDevice\{00001812-0000-1000-8000-00805f9b34fb}_Dev_VID&010416_PID&0301_REV&0003` |
-| Current driver | Microsoft `bthleenum.inf`, version `10.0.26100.8521` |
-| Current state | Started, problem code `0x00000000`, no device UpperFilters/LowerFilters |
+| Inbox baseline | Microsoft `bthleenum.inf`, version `10.0.26100.8521` |
+| Current development driver | VibeController `1.0.0.6`, Started, problem code `0x00000000` |
 
 The Bluetooth address and full device instance ID are intentionally not recorded in source control.
 
@@ -25,7 +114,7 @@ With the Microsoft HID-over-GATT package (`hidbthle.inf`) selected, Windows stop
 
 Switching that one service node to the generic Microsoft GATT driver (`bthleenum.inf`) removed the Device Manager error. It did not make button reports readable: WinRT and Win32 GATT report-map/report access still returned Access Denied. This proves the pairing, service enumeration, and PnP service PDO exist, but it does not prove that Windows can parse the remote's HID report descriptor.
 
-## Selected architecture
+## Initial capture architecture
 
 The first driver package is a capture-only KMDF upper filter for the exact hardware ID above. Windows keeps the inbox `hidbthle`/`mshidumdf` stack. The filter post-processes only `IOCTL_HID_GET_REPORT_DESCRIPTOR`, copies the successful result into bounded nonpaged storage, and persists a diagnostic copy at PASSIVE_LEVEL.
 
@@ -89,7 +178,7 @@ Capture-filter verification on 2026-07-22:
 - MSVC/WDK C/C++ Code Analysis completed with no findings;
 - WDK 10.0.26100 reports that Static Driver Verifier is no longer included and is incompatible with Visual Studio 2022. No SDV result is claimed; using an older EWDK solely for SDV remains optional before distribution.
 
-The WDK package-verifier task expects an x86 `InfVerif.dll` that this x64 WDK installation does not contain. The project therefore skips that broken in-build task and runs the installed x64 `InfVerif.exe /w` explicitly. Inf2Cat signability checking remains enabled. The package is unsigned and has not been installed.
+The WDK package-verifier task expects an x86 `InfVerif.dll` that this x64 WDK installation does not contain. The project therefore skips that broken in-build task and runs the installed x64 `InfVerif.exe /w` explicitly. Inf2Cat signability checking remains enabled. At this historical checkpoint, the package was unsigned and had not yet been installed; the current installed development state is recorded at the top of this document.
 
 ## Controlled installation workflow
 
@@ -104,7 +193,7 @@ Both commands default to a non-mutating preview. A real operation additionally r
 
 The live preview on 2026-07-22 found the exact RC901A device and returned `Mode=WhatIf`, `WillMutate=False`, and `CatalogSignatureStatus=NotSigned`. No rollback-state file was created and no PnP mutation was attempted. The full device instance ID remains local and uncommitted.
 
-The current signing gate is therefore closed. The elevated read-only audit on 2026-07-22 confirmed that Secure Boot is enabled, the system volume is fully decrypted with BitLocker protection off, `testsigning`, `nointegritychecks`, and kernel debugging are not configured in the current BCD entry, the hypervisor starts automatically, and virtualization-based security plus kernel code-integrity enforcement are active. Do not create trust certificates, enable `TESTSIGNING`, disable Secure Boot, or install the package without explicit user approval and a reboot/rollback plan.
+At the 2026-07-22 checkpoint, the signing gate was closed. The elevated read-only audit confirmed that Secure Boot was enabled, the system volume was fully decrypted with BitLocker protection off, `testsigning`, `nointegritychecks`, and kernel debugging were not configured in the current BCD entry, the hypervisor started automatically, and virtualization-based security plus kernel code-integrity enforcement were active. A later, explicitly approved one-boot test-signing workflow was used for physical development-machine validation. Do not repeat certificate, boot, or driver changes without explicit approval and a rollback plan.
 
 ## Preferred one-boot capture workflow
 
@@ -145,5 +234,11 @@ Before first installation, the install script records the service instance state
 - [Microsoft BLE overview](https://learn.microsoft.com/en-us/windows-hardware/drivers/bluetooth/bluetooth-low-energy-overview)
 - [Preprocessing and postprocessing IRPs](https://learn.microsoft.com/en-us/windows-hardware/drivers/wdf/preprocessing-and-postprocessing-irps)
 - [`IOCTL_HID_GET_REPORT_DESCRIPTOR`](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/hidport/ni-hidport-ioctl_hid_get_report_descriptor)
+- [Using control device objects](https://learn.microsoft.com/en-us/windows-hardware/drivers/wdf/using-control-device-objects)
+- [`WdfControlDeviceInitAllocate`](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdfcontrol/nf-wdfcontrol-wdfcontroldeviceinitallocate)
+- [Framework file objects](https://learn.microsoft.com/en-us/windows-hardware/drivers/wdf/framework-file-objects)
+- [`WdfDeviceCreateDeviceInterface`](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdfdevice/nf-wdfdevice-wdfdevicecreatedeviceinterface)
+- [`WdfDriverOpenParametersRegistryKey`](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdfdriver/nf-wdfdriver-wdfdriveropenparametersregistrykey)
+- [Introduction to registry keys for drivers](https://learn.microsoft.com/en-us/windows-hardware/drivers/wdf/introduction-to-registry-keys-for-drivers)
 - [Microsoft Firefly KMDF HID filter sample](https://github.com/microsoft/Windows-driver-samples/tree/main/hid/firefly)
 - [Microsoft vhidmini2 sample](https://github.com/microsoft/Windows-driver-samples/tree/main/hid/vhidmini2)
