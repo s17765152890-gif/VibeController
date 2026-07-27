@@ -261,4 +261,3 @@ Expected acceptance evidence: the UI identifies the paired device, reaches Conne
 git add README.md PRD.md docs/testing/RC901A-BLE-CAPTURE.md
 git commit -m "docs: add RC901A BLE capture workflow"
 ```
-
