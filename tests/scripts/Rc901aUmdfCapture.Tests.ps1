@@ -2,6 +2,8 @@ $projectRoot = Join-Path $PSScriptRoot '..\..\drivers\Rc901aHidFilter\umdf'
 $projectPath = Join-Path $projectRoot 'Rc901aUmdfCapture.vcxproj'
 $infPath = Join-Path $projectRoot 'Rc901aHidFilter.inx'
 $sourcePath = Join-Path $projectRoot 'Rc901aUmdfCapture.c'
+$protocolPath = Join-Path $projectRoot '..\driver\Rc901aCaptureProtocol.h'
+$inputCapturePath = Join-Path $projectRoot '..\driver\InputReportCapture.h'
 $exactHardwareId = 'BTHLEDevice\{00001812-0000-1000-8000-00805f9b34fb}_Dev_VID&010416_PID&0301_REV&0003'
 
 Describe 'RC901A exact-device UMDF2 capture project' {
@@ -17,7 +19,7 @@ Describe 'RC901A exact-device UMDF2 capture project' {
         $content | Should Match 'mincore\.lib'
         $content | Should Match '<FilesToPackage Include="\$\(TargetPath\)"'
         $content | Should Match '<DateStamp>07/27/2026</DateStamp>'
-        $content | Should Match '<TimeStamp>1\.0\.0\.5</TimeStamp>'
+        $content | Should Match '<TimeStamp>1\.0\.0\.6</TimeStamp>'
     }
 
     It 'targets only the exact RC901A HID-over-GATT service node' {
@@ -36,7 +38,7 @@ Describe 'RC901A exact-device UMDF2 capture project' {
         $orders = @([regex]::Matches($content, '(?im)^\s*UmdfServiceOrder\s*=.*$'))
 
         $orders.Count | Should Be 1
-        $content | Should Match '(?im)^\s*DriverVer\s*=\s*07/27/2026\s*,\s*1\.0\.0\.5\s*$'
+        $content | Should Match '(?im)^\s*DriverVer\s*=\s*07/27/2026\s*,\s*1\.0\.0\.6\s*$'
         $content | Should Not Match '(?im)^\s*Needs\s*=\s*HidBthLE\.NT\.Wdf\s*$'
         $content | Should Match '(?im)^\s*UmdfService\s*=\s*Rc901aUmdfCapture\s*,\s*Rc901aUmdfCapture\.Wdf\s*$'
         $content | Should Match '(?im)^\s*UmdfServiceOrder\s*=\s*HidOverGatt\s*,\s*Rc901aUmdfCapture\s*$'
@@ -158,5 +160,46 @@ Describe 'RC901A UMDF input-report capture contract' {
         $content | Should Match 'Rc901aInputReportCount'
         $content | Should Match 'Rc901aInputReportTotal'
         $content | Should Match 'WdfWorkItemEnqueue'
+    }
+}
+
+Describe 'RC901A normal-user snapshot interface contract' {
+    It 'declares a versioned read-only protocol and stable device interface' {
+        Test-Path -LiteralPath $protocolPath | Should Be $true
+        Test-Path -LiteralPath $inputCapturePath | Should Be $true
+        $protocolContent = Get-Content -LiteralPath $protocolPath -Raw
+        $captureContent = Get-Content -LiteralPath $inputCapturePath -Raw
+
+        $captureContent | Should Match 'RC901A_CAPTURE_PROTOCOL_VERSION\s+1U'
+        $captureContent | Should Match 'RC901A_INPUT_REPORT_SNAPSHOT'
+        $captureContent | Should Match 'RC901A_INPUT_REPORT_SNAPSHOT_HEADER_SIZE'
+        $protocolContent | Should Match 'GUID_DEVINTERFACE_VIBECONTROLLER_RC901A_CAPTURE'
+        $protocolContent | Should Match '0x34826b0c'
+        $protocolContent | Should Match '0xf006'
+        $protocolContent | Should Match '0x44e1'
+        $protocolContent | Should Match '0xae'
+        $protocolContent | Should Match '0x98'
+        $protocolContent | Should Match 'IOCTL_RC901A_GET_INPUT_REPORTS'
+        $protocolContent | Should Match 'METHOD_BUFFERED'
+        $protocolContent | Should Match 'FILE_READ_ACCESS'
+    }
+
+    It 'publishes the exact-device interface and completes snapshot requests locally' {
+        $content = Get-Content -LiteralPath $sourcePath -Raw
+
+        $content | Should Match 'WdfDeviceCreateDeviceInterface'
+        $content | Should Match 'GUID_DEVINTERFACE_VIBECONTROLLER_RC901A_CAPTURE'
+        $content | Should Match 'IOCTL_RC901A_GET_INPUT_REPORTS'
+        $content | Should Match 'Rc901aCompleteInputSnapshotRequest'
+        $content | Should Match 'Rc901aBuildInputReportSnapshot'
+        $content | Should Match 'WdfRequestRetrieveOutputBuffer'
+        $content | Should Not Match 'WdfRequestRetrieveInputBuffer'
+        $content | Should Match 'WdfRequestCompleteWithInformation'
+    }
+
+    It 'packages the shared protocol header in the UMDF project' {
+        $content = Get-Content -LiteralPath $projectPath -Raw
+
+        $content | Should Match 'Rc901aCaptureProtocol\.h'
     }
 }

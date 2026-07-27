@@ -5,6 +5,7 @@
 
 #include "DescriptorCapture.h"
 #include "InputReportCapture.h"
+#include "Rc901aCaptureProtocol.h"
 #include "Sha256.h"
 
 typedef struct _RC901A_UMDF_DEVICE_CONTEXT {
@@ -70,6 +71,64 @@ Rc901aQueuePersistWorkItem(
     if (InterlockedCompareExchange(&Context->WorkItemQueued, 1, 0) == 0) {
         WdfWorkItemEnqueue(Context->PersistWorkItem);
     }
+}
+
+static VOID
+Rc901aCompleteInputSnapshotRequest(
+    _In_ PRC901A_UMDF_DEVICE_CONTEXT Context,
+    _In_ WDFREQUEST Request
+    )
+{
+    RC901A_INPUT_REPORT_SNAPSHOT* snapshot;
+    PVOID outputBuffer;
+    size_t outputCapacity;
+    size_t bytesWritten;
+    RC901A_INPUT_REPORT_CAPTURE_RESULT captureResult;
+    NTSTATUS status;
+
+    outputBuffer = NULL;
+    outputCapacity = 0U;
+    bytesWritten = 0U;
+    status = WdfRequestRetrieveOutputBuffer(
+        Request,
+        sizeof(RC901A_INPUT_REPORT_SNAPSHOT),
+        &outputBuffer,
+        &outputCapacity
+        );
+    if (!NT_SUCCESS(status)) {
+        WdfRequestCompleteWithInformation(Request, status, 0U);
+        return;
+    }
+
+    snapshot = (RC901A_INPUT_REPORT_SNAPSHOT*)outputBuffer;
+    WdfSpinLockAcquire(Context->CaptureLock);
+    captureResult = Rc901aBuildInputReportSnapshot(
+        &Context->InputReports,
+        snapshot,
+        outputCapacity,
+        &bytesWritten
+        );
+    WdfSpinLockRelease(Context->CaptureLock);
+
+    switch (captureResult) {
+    case Rc901aInputReportCaptureSuccess:
+        status = STATUS_SUCCESS;
+        break;
+    case Rc901aInputReportCaptureDestinationTooSmall:
+        status = STATUS_BUFFER_TOO_SMALL;
+        bytesWritten = 0U;
+        break;
+    default:
+        status = STATUS_INVALID_PARAMETER;
+        bytesWritten = 0U;
+        break;
+    }
+
+    WdfRequestCompleteWithInformation(
+        Request,
+        status,
+        NT_SUCCESS(status) ? bytesWritten : 0U
+        );
 }
 
 static VOID
@@ -249,6 +308,15 @@ Rc901aEvtUmdfDeviceAdd(
         return status;
     }
 
+    status = WdfDeviceCreateDeviceInterface(
+        device,
+        &GUID_DEVINTERFACE_VIBECONTROLLER_RC901A_CAPTURE,
+        NULL
+        );
+    if (!NT_SUCCESS(status)) {
+        return status;
+    }
+
     context = Rc901aGetUmdfDeviceContext(device);
     context->DescriptorLength = 0U;
     context->CaptureStatus = Rc901aCaptureEmpty;
@@ -330,6 +398,12 @@ Rc901aEvtIoDeviceControl(
     UNREFERENCED_PARAMETER(InputBufferLength);
 
     device = WdfIoQueueGetDevice(Queue);
+    context = Rc901aGetUmdfDeviceContext(device);
+    if (IoControlCode == IOCTL_RC901A_GET_INPUT_REPORTS) {
+        Rc901aCompleteInputSnapshotRequest(context, Request);
+        return;
+    }
+
     if (IoControlCode != IOCTL_HID_GET_REPORT_DESCRIPTOR &&
         IoControlCode != IOCTL_HID_READ_REPORT &&
         IoControlCode != IOCTL_HID_GET_INPUT_REPORT) {
@@ -337,7 +411,6 @@ Rc901aEvtIoDeviceControl(
         return;
     }
 
-    context = Rc901aGetUmdfDeviceContext(device);
     completionRoutine =
         IoControlCode == IOCTL_HID_GET_REPORT_DESCRIPTOR
         ? Rc901aEvtDescriptorComplete

@@ -78,12 +78,13 @@
   <ItemGroup>
     <ClInclude Include="..\driver\DescriptorCapture.h" />
     <ClInclude Include="..\driver\InputReportCapture.h" />
+    <ClInclude Include="..\driver\Rc901aCaptureProtocol.h" />
     <ClInclude Include="..\driver\Sha256.h" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="Rc901aHidFilter.inx">
     <DateStamp>07/27/2026</DateStamp>
-    <TimeStamp>1.0.0.5</TimeStamp>
+    <TimeStamp>1.0.0.6</TimeStamp>
     </Inf>
   </ItemGroup>
   <ItemGroup>
