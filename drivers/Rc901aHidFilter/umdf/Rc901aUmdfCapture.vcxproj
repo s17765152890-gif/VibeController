@@ -72,16 +72,18 @@
   <ItemGroup>
     <ClCompile Include="Rc901aUmdfCapture.c" />
     <ClCompile Include="..\driver\DescriptorCapture.c" />
+    <ClCompile Include="..\driver\InputReportCapture.c" />
     <ClCompile Include="..\driver\Sha256.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\driver\DescriptorCapture.h" />
+    <ClInclude Include="..\driver\InputReportCapture.h" />
     <ClInclude Include="..\driver\Sha256.h" />
   </ItemGroup>
   <ItemGroup>
     <Inf Include="Rc901aHidFilter.inx">
-      <DateStamp>07/26/2026</DateStamp>
-      <TimeStamp>1.0.0.0</TimeStamp>
+    <DateStamp>07/27/2026</DateStamp>
+    <TimeStamp>1.0.0.5</TimeStamp>
     </Inf>
   </ItemGroup>
   <ItemGroup>

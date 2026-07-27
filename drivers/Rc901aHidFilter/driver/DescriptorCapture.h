@@ -12,6 +12,12 @@ typedef enum RC901A_CAPTURE_RESULT {
     Rc901aCaptureDestinationTooSmall
 } RC901A_CAPTURE_RESULT;
 
+typedef enum RC901A_DESCRIPTOR_REPAIR_RESULT {
+    Rc901aDescriptorRepairNotApplicable = 0,
+    Rc901aDescriptorRepairApplied,
+    Rc901aDescriptorRepairInvalidArgument
+} RC901A_DESCRIPTOR_REPAIR_RESULT;
+
 RC901A_CAPTURE_RESULT
 Rc901aCopyDescriptor(
     const unsigned char* source,
@@ -19,4 +25,10 @@ Rc901aCopyDescriptor(
     unsigned char* destination,
     size_t destinationCapacity,
     size_t* bytesWritten
+    );
+
+RC901A_DESCRIPTOR_REPAIR_RESULT
+Rc901aRepairReportDescriptor(
+    unsigned char* descriptor,
+    size_t descriptorLength
     );

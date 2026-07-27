@@ -4,7 +4,7 @@ Class = HIDClass
 ClassGuid = {745a17a0-74d3-11d0-b6fe-00a0c90f57da}
 Provider = %ProviderName%
 CatalogFile = Rc901aHidFilter.cat
-DriverVer = 07/26/2026,1.0.0.0
+DriverVer = 07/27/2026,1.0.0.5
 PnpLockdown = 1
 
 [ControlFlags]
@@ -42,10 +42,13 @@ Include = hidbthle.inf
 Needs = HidBthLE.NT.Services
 
 [Rc901aCapture_Install.NT.Wdf]
-Include = hidbthle.inf
-Needs = HidBthLE.NT.Wdf
 UmdfService = Rc901aUmdfCapture, Rc901aUmdfCapture.Wdf
 UmdfServiceOrder = HidOverGatt, Rc901aUmdfCapture
+UmdfKernelModeClientPolicy = AllowKernelModeClients
+UmdfFileObjectPolicy = AllowNullAndUnknownFileObjects
+UmdfFsContextUsePolicy = CanUseFsContext2
+UmdfHostPriority = PriorityHigh
+UmdfMethodNeitherAction = Copy
 
 [Rc901aUmdfCapture.Wdf]
 UmdfLibraryVersion = $UMDFVERSION$

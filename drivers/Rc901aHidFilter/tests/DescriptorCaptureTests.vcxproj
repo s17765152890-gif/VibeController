@@ -62,7 +62,11 @@
   <ItemGroup>
     <ClCompile Include="DescriptorCaptureTests.c" />
     <ClCompile Include="..\driver\DescriptorCapture.c" />
+    <ClCompile Include="..\driver\InputReportCapture.c" />
     <ClCompile Include="..\driver\Sha256.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\driver\Rc901aCaptureProtocol.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
