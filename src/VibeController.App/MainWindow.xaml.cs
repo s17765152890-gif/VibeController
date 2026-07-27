@@ -1,15 +1,19 @@
 using System.ComponentModel;
 using System.IO;
 using System.Windows;
+using System.Windows.Interop;
 using Microsoft.Web.WebView2.Core;
 using VibeController.App.Services;
 using VibeController.Infrastructure.Settings;
+using VibeController.Infrastructure.Windows;
 
 namespace VibeController.App;
 
 public partial class MainWindow : Window
 {
     private readonly ControllerRuntimeService _runtime;
+    private readonly WindowsRc901aRawInputSource _rc901aRawInput;
+    private HwndSource? _windowSource;
     private TrayIconService? _tray;
     private bool _exitRequested;
 
@@ -19,9 +23,34 @@ public partial class MainWindow : Window
         var settingsDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "VibeController");
-        _runtime = new ControllerRuntimeService(new JsonSettingsStore(settingsDirectory));
+        _rc901aRawInput = new WindowsRc901aRawInputSource();
+        _runtime = new ControllerRuntimeService(
+            new JsonSettingsStore(settingsDirectory),
+            _rc901aRawInput);
+        SourceInitialized += OnSourceInitialized;
         Loaded += OnLoaded;
         Closing += OnClosing;
+    }
+
+    private void OnSourceInitialized(object? sender, EventArgs e)
+    {
+        var windowHandle = new WindowInteropHelper(this).Handle;
+        _windowSource = HwndSource.FromHwnd(windowHandle)
+            ?? throw new InvalidOperationException(
+                "VibeController could not attach to its Windows message window.");
+        _windowSource.AddHook(OnWindowMessage);
+        _rc901aRawInput.AttachWindow(windowHandle);
+    }
+
+    private IntPtr OnWindowMessage(
+        IntPtr windowHandle,
+        int message,
+        IntPtr wParam,
+        IntPtr lParam,
+        ref bool handled)
+    {
+        _rc901aRawInput.ProcessWindowMessage(message, wParam, lParam);
+        return IntPtr.Zero;
     }
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
@@ -108,6 +137,8 @@ public partial class MainWindow : Window
         _tray?.Dispose();
         _runtime.StateJsonReady -= OnStateJsonReady;
         await _runtime.DisposeAsync();
+        _windowSource?.RemoveHook(OnWindowMessage);
+        _rc901aRawInput.Dispose();
         System.Windows.Application.Current.Shutdown();
     }
 }

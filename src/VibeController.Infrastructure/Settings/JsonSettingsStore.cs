@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using VibeController.Core.Devices;
 using VibeController.Core.Domain;
 using VibeController.Core.Mapping;
 
@@ -122,7 +123,12 @@ public sealed class JsonSettingsStore : ISettingsStore
                 control,
                 defaults.Mappings[control]);
         }
-        result = result with { Profile = profile };
+        result = result with
+        {
+            Profile = profile,
+            Rc901aLearnedBindings = Rc901aInputBindings.NormalizeLearned(
+                result.Rc901aLearnedBindings),
+        };
 
         return result;
     }
@@ -206,6 +212,11 @@ public sealed class JsonSettingsStore : ISettingsStore
     {
         Directory.CreateDirectory(_directory);
         var temporaryPath = Path.Combine(_directory, $".{FileName}.{Guid.NewGuid():N}.tmp");
+        var persistedSettings = settings with
+        {
+            Rc901aLearnedBindings = Rc901aInputBindings.NormalizeLearned(
+                settings.Rc901aLearnedBindings),
+        };
 
         try
         {
@@ -213,7 +224,7 @@ public sealed class JsonSettingsStore : ISettingsStore
             {
                 await JsonSerializer.SerializeAsync(
                     stream,
-                    settings,
+                    persistedSettings,
                     _options,
                     cancellationToken);
             }

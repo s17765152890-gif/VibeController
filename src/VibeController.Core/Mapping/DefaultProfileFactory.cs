@@ -59,6 +59,17 @@ public static class DefaultProfileFactory
             [ControllerControl.RemoteDigit7] = new(MappedActionKind.None),
             [ControllerControl.RemoteDigit8] = new(MappedActionKind.None),
             [ControllerControl.RemoteDigit9] = new(MappedActionKind.None),
+            [ControllerControl.RemotePower] = new(MappedActionKind.None),
+            [ControllerControl.RemoteInput] = new(MappedActionKind.None),
+            [ControllerControl.RemoteRed] = new(MappedActionKind.None),
+            [ControllerControl.RemoteGreen] = new(MappedActionKind.None),
+            [ControllerControl.RemoteBlue] = new(MappedActionKind.None),
+            [ControllerControl.RemoteSettings] = new(MappedActionKind.None),
+            [ControllerControl.RemoteApp1] = new(MappedActionKind.None),
+            [ControllerControl.RemoteApp2] = new(MappedActionKind.None),
+            [ControllerControl.RemoteBrightnessUp] = new(MappedActionKind.None),
+            [ControllerControl.RemoteBrightnessDown] = new(MappedActionKind.None),
+            [ControllerControl.RemotePictureMode] = new(MappedActionKind.None),
         };
 
         return new MappingProfile("Codex 默认配置", mappings);

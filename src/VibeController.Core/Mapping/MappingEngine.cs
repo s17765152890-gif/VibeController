@@ -16,6 +16,10 @@ public sealed class MappingEngine
         ControllerControl.RightStickDown,
         ControllerControl.RightStickLeft,
         ControllerControl.RightStickRight,
+        ControllerControl.RemoteUp,
+        ControllerControl.RemoteDown,
+        ControllerControl.RemoteLeft,
+        ControllerControl.RemoteRight,
     ];
 
     private static readonly HashSet<ControllerControl> ContinuousControls =

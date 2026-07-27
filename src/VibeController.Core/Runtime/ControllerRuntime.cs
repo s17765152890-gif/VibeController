@@ -57,6 +57,10 @@ public sealed class ControllerRuntime : IDisposable
         ControllerControl.RightStickDown,
         ControllerControl.RightStickLeft,
         ControllerControl.RightStickRight,
+        ControllerControl.RemoteUp,
+        ControllerControl.RemoteDown,
+        ControllerControl.RemoteLeft,
+        ControllerControl.RemoteRight,
     ];
     private static readonly ControllerControl[] ContinuousControls =
     [

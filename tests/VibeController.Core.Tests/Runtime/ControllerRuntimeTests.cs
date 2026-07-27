@@ -98,6 +98,56 @@ public sealed class ControllerRuntimeTests
     }
 
     [Fact]
+    public async Task Tick_HeldRemoteDirectionRepeatsAfterDelayAndStopsOnRelease()
+    {
+        var held = ControllerSnapshot.Empty.With(ControllerControl.RemoteUp, 1f);
+        var released = ControllerSnapshot.Empty;
+        var adapter = new QueueControllerAdapter(
+            Connected(1, held),
+            Connected(1, held),
+            Connected(1, held),
+            Connected(2, released),
+            Connected(2, released));
+        var executor = new RecordingExecutor();
+        var runtime = CreateRuntime(adapter, executor);
+
+        var pressed = await runtime.TickAsync(Options, DateTimeOffset.UnixEpoch);
+        var beforeDelay = await runtime.TickAsync(
+            Options,
+            DateTimeOffset.UnixEpoch.AddMilliseconds(300));
+        var repeated = await runtime.TickAsync(
+            Options,
+            DateTimeOffset.UnixEpoch.AddMilliseconds(350));
+        var release = await runtime.TickAsync(
+            Options,
+            DateTimeOffset.UnixEpoch.AddMilliseconds(360));
+        var afterRelease = await runtime.TickAsync(
+            Options,
+            DateTimeOffset.UnixEpoch.AddMilliseconds(500));
+
+        Assert.Contains(pressed.InputEvents, item =>
+            item.Control == ControllerControl.RemoteUp &&
+            item.Edge == InputEdge.Pressed);
+        Assert.DoesNotContain(beforeDelay.InputEvents, item =>
+            item.Control == ControllerControl.RemoteUp &&
+            item.Edge == InputEdge.Repeated);
+        Assert.Contains(repeated.InputEvents, item =>
+            item.Control == ControllerControl.RemoteUp &&
+            item.Edge == InputEdge.Repeated);
+        Assert.Contains(release.InputEvents, item =>
+            item.Control == ControllerControl.RemoteUp &&
+            item.Edge == InputEdge.Released);
+        Assert.DoesNotContain(afterRelease.InputEvents, item =>
+            item.Control == ControllerControl.RemoteUp);
+        Assert.Equal(2, executor.Invocations.Count);
+        Assert.All(executor.Invocations, invocation =>
+        {
+            Assert.Equal(MappedActionKind.KeyboardShortcut, invocation.Action.Kind);
+            Assert.Equal("ArrowUp", invocation.Action.Shortcut?.Key);
+        });
+    }
+
+    [Fact]
     public async Task Tick_HeldStickContinuesMouseMovementWithoutNewXInputPackets()
     {
         var held = ControllerSnapshot.Empty.With(ControllerControl.LeftStickX, 0.6f);

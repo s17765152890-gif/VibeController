@@ -1,3 +1,5 @@
+using System.Text.Json;
+using VibeController.Core.Devices;
 using VibeController.Core.Domain;
 using VibeController.Core.Mapping;
 using VibeController.Infrastructure.Settings;
@@ -74,6 +76,108 @@ public sealed class JsonSettingsStoreTests : IDisposable
             settings.DictationShortcut.Modifiers);
         Assert.Equal(MappedActionKind.CodexDictation,
             settings.Profile.Mappings[ControllerControl.X].Kind);
+        Assert.Empty(settings.Rc901aLearnedBindings);
+    }
+
+    [Fact]
+    public async Task Load_ExistingJsonWithoutLearnedBindingsUsesAnEmptyList()
+    {
+        Directory.CreateDirectory(_directory);
+        await File.WriteAllTextAsync(
+            Path.Combine(_directory, "settings.json"),
+            """{"mappingEnabled":true}""");
+        var store = new JsonSettingsStore(_directory);
+
+        var settings = await store.LoadAsync();
+
+        Assert.Empty(settings.Rc901aLearnedBindings);
+    }
+
+    [Fact]
+    public async Task Load_LearnedBindingsWithNullElementIgnoresTheInvalidEntry()
+    {
+        Directory.CreateDirectory(_directory);
+        await File.WriteAllTextAsync(
+            Path.Combine(_directory, "settings.json"),
+            """
+            {
+              "rc901aLearnedBindings": [
+                null,
+                {
+                  "kind": "ConsumerControl",
+                  "code": 548,
+                  "control": "RemoteBack",
+                  "source": "Learned"
+                }
+              ]
+            }
+            """);
+        var store = new JsonSettingsStore(_directory);
+
+        var settings = await store.LoadAsync();
+
+        Assert.Equal(
+        [
+            new(
+                Rc901aRawInputKind.ConsumerControl,
+                0x0224,
+                ControllerControl.RemoteBack,
+                Rc901aBindingSource.Learned),
+        ],
+            settings.Rc901aLearnedBindings);
+    }
+
+    [Fact]
+    public async Task SaveAndLoad_RoundTripsOnlyNormalizedLearnedBindings()
+    {
+        var learned = new Rc901aInputBinding(
+            Rc901aRawInputKind.ConsumerControl,
+            0x0224,
+            ControllerControl.RemoteBack,
+            Rc901aBindingSource.Learned);
+        var store = new JsonSettingsStore(_directory);
+        await store.SaveAsync(AppSettings.CreateDefault() with
+        {
+            Rc901aLearnedBindings =
+            [
+                learned,
+                new(
+                    Rc901aRawInputKind.Keyboard,
+                    0x26,
+                    ControllerControl.RemoteMenu,
+                    Rc901aBindingSource.Learned),
+                new(
+                    Rc901aRawInputKind.ConsumerControl,
+                    0x00E9,
+                    ControllerControl.RemoteVolumeUp,
+                    Rc901aBindingSource.VerifiedDefault),
+            ],
+        });
+
+        var actual = await store.LoadAsync();
+        using var json = JsonDocument.Parse(await File.ReadAllTextAsync(
+            Path.Combine(_directory, "settings.json")));
+
+        Assert.Equal(
+        [
+            learned,
+            new(
+                Rc901aRawInputKind.Keyboard,
+                0x26,
+                ControllerControl.RemoteMenu,
+                Rc901aBindingSource.Learned),
+        ],
+            actual.Rc901aLearnedBindings);
+        var persisted = json.RootElement
+            .GetProperty("rc901aLearnedBindings")
+            .EnumerateArray()
+            .ToArray();
+        Assert.Equal(2, persisted.Length);
+        Assert.All(
+            persisted,
+            binding => Assert.Equal(
+                "Learned",
+                binding.GetProperty("source").GetString()));
     }
 
     [Fact]
@@ -253,9 +357,15 @@ public sealed class JsonSettingsStoreTests : IDisposable
             .ToDictionary(pair => pair.Key, pair => pair.Value);
         oldMappings[ControllerControl.X] = new MappedAction(MappedActionKind.Send);
         var store = new JsonSettingsStore(_directory);
+        var learned = new Rc901aInputBinding(
+            Rc901aRawInputKind.ConsumerControl,
+            0x0224,
+            ControllerControl.RemoteBack,
+            Rc901aBindingSource.Learned);
         await store.SaveAsync(AppSettings.CreateDefault() with
         {
             Profile = new MappingProfile("Existing profile", oldMappings),
+            Rc901aLearnedBindings = [learned],
         });
 
         var actual = await store.LoadAsync();
@@ -267,6 +377,7 @@ public sealed class JsonSettingsStoreTests : IDisposable
             actual.Profile.Mappings[ControllerControl.RemoteMic].Kind);
         AssertShortcut(actual.Profile, ControllerControl.RemoteBack, "Backspace");
         AssertShortcut(actual.Profile, ControllerControl.RemoteLeft, "ArrowLeft");
+        Assert.Equal([learned], actual.Rc901aLearnedBindings);
     }
 
     private static void AssertShortcut(

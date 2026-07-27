@@ -1,3 +1,4 @@
+using VibeController.Core.Devices;
 using VibeController.Core.Domain;
 using VibeController.Core.Mapping;
 
@@ -31,6 +32,8 @@ public sealed record AppSettings
     public bool CodexLightbarEnabled { get; init; }
 
     public MappingProfile Profile { get; init; } = DefaultProfileFactory.Create();
+
+    public IReadOnlyList<Rc901aInputBinding> Rc901aLearnedBindings { get; init; } = [];
 
     public static AppSettings CreateDefault() => new()
     {

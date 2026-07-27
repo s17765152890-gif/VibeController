@@ -31,7 +31,13 @@ public sealed record RuntimeConfigurationPayload(
     MicrophoneStatus? Microphone = null,
     CodexHookRegistrationStatus? CodexHook = null,
     CodexActivityStatus? CodexActivity = null,
-    Rc901aStatus? Rc901a = null);
+    Rc901aStatus? Rc901a = null,
+    Rc901aInputStatus? Rc901aInput = null);
+
+public sealed record Rc901aInputStatus(
+    IReadOnlyList<Rc901aInputBinding> Bindings,
+    Rc901aUnknownInputSignal? LastUnknown,
+    Rc901aLearningStatus Learning);
 
 public static class BridgeMessageFactory
 {

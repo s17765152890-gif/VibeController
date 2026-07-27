@@ -19,8 +19,12 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
     private readonly IAudioInputDetector _audioInputDetector;
     private readonly CodexActivityStore _codexActivityStore;
     private readonly CodexHookInstaller _codexHookInstaller;
+    private readonly IRc901aRawInputSource? _rc901aRawInputSource;
+    private readonly object _rc901aLearningGate = new();
+    private readonly Rc901aLearningSession _rc901aLearning = new();
     private readonly CancellationTokenSource _cancellation = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly SemaphoreSlim _settingsWriteGate = new(1, 1);
     private AppSettings _settings = AppSettings.CreateDefault();
     private ControllerRuntime? _runtime;
     private IControllerLightbar? _lightbar;
@@ -30,6 +34,9 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
     private string? _lastJson;
     private bool _stateDirty = true;
     private DateTimeOffset _nextIntegrationPoll = DateTimeOffset.MinValue;
+    private bool _rc901aInputSubscribed;
+    private Rc901aUnknownInputSignal? _lastUnknownRc901aInput;
+    private CancellationTokenSource? _rc901aLearningSaveCancellation;
     private CodexActivityLightbarAnimation _lightbarAnimation = new();
     private MicrophoneStatus _microphoneStatus = new(
         MicrophoneDetectionState.Error,
@@ -49,9 +56,12 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
 
     public event Action<string>? StateJsonReady;
 
-    public ControllerRuntimeService(ISettingsStore settingsStore)
+    public ControllerRuntimeService(
+        ISettingsStore settingsStore,
+        IRc901aRawInputSource? rc901aRawInputSource = null)
     {
         _settingsStore = settingsStore;
+        _rc901aRawInputSource = rc901aRawInputSource;
         var localDataDirectory = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "VibeController");
@@ -76,6 +86,7 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
     {
         _settings = await _settingsStore.LoadAsync(_cancellation.Token);
         RefreshIntegrations();
+        SubscribeToRc901aInput();
         RebuildRuntime();
         _loop = RunLoopAsync(_cancellation.Token);
     }
@@ -92,54 +103,100 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
 
         var type = typeElement.GetString();
         var payload = root.TryGetProperty("payload", out var value) ? value : default;
-        await _gate.WaitAsync(_cancellation.Token);
+
+        if (string.Equals(
+                type,
+                "confirmRc901aLearning",
+                StringComparison.Ordinal))
+        {
+            await ConfirmRc901aLearningAsync(payload);
+            return;
+        }
+
+        var serializesSettingsWrite = CommandWritesSettings(type);
+        if (serializesSettingsWrite)
+        {
+            await _settingsWriteGate.WaitAsync(_cancellation.Token);
+        }
+
         try
         {
-            switch (type)
+            await _gate.WaitAsync(_cancellation.Token);
+            try
             {
-                case "setMappingEnabled":
-                    _settings = _settings with { MappingEnabled = payload.GetProperty("enabled").GetBoolean() };
-                    _stateDirty = true;
-                    await _settingsStore.SaveAsync(_settings, _cancellation.Token);
-                    break;
-                case "setTestMode":
-                    _testMode = payload.GetProperty("enabled").GetBoolean();
-                    _stateDirty = true;
-                    break;
-                case "updateSettings":
-                    await UpdateSettingsAsync(payload);
-                    break;
-                case "updateMapping":
-                    await UpdateMappingAsync(payload);
-                    break;
-                case "resetDefaults":
-                    _settings = _settings with { Profile = DefaultProfileFactory.Create() };
-                    _stateDirty = true;
-                    RebuildRuntime();
-                    await _settingsStore.SaveAsync(_settings, _cancellation.Token);
-                    break;
-                case "requestState":
-                    PublishCurrent();
-                    break;
-                case "refreshIntegrations":
-                    RefreshIntegrations();
-                    break;
-                case "refreshRc901a":
-                    if (_rc901aAdapter is not null)
-                    {
-                        await _rc901aAdapter.RefreshAsync(_cancellation.Token);
-                    }
-                    break;
-                case "clearRc901aSamples":
-                    _rc901aAdapter?.ClearSamples();
-                    break;
+                switch (type)
+                {
+                    case "setMappingEnabled":
+                        _settings = _settings with { MappingEnabled = payload.GetProperty("enabled").GetBoolean() };
+                        _stateDirty = true;
+                        await _settingsStore.SaveAsync(_settings, _cancellation.Token);
+                        break;
+                    case "setTestMode":
+                        _testMode = payload.GetProperty("enabled").GetBoolean();
+                        _stateDirty = true;
+                        break;
+                    case "updateSettings":
+                        await UpdateSettingsAsync(payload);
+                        break;
+                    case "updateMapping":
+                        await UpdateMappingAsync(payload);
+                        break;
+                    case "resetDefaults":
+                        _settings = _settings with { Profile = DefaultProfileFactory.Create() };
+                        _stateDirty = true;
+                        RebuildRuntime();
+                        await _settingsStore.SaveAsync(_settings, _cancellation.Token);
+                        break;
+                    case "requestState":
+                        PublishCurrent();
+                        break;
+                    case "refreshIntegrations":
+                        RefreshIntegrations();
+                        break;
+                    case "refreshRc901a":
+                        if (_rc901aAdapter is not null)
+                        {
+                            await _rc901aAdapter.RefreshAsync(_cancellation.Token);
+                        }
+                        break;
+                    case "clearRc901aSamples":
+                        _rc901aAdapter?.ClearSamples();
+                        break;
+                    case "startRc901aLearning":
+                        StartRc901aLearning(payload);
+                        break;
+                    case "retryRc901aLearning":
+                        RetryRc901aLearning(payload);
+                        break;
+                    case "cancelRc901aLearning":
+                        CancelRc901aLearning(payload);
+                        break;
+                    case "resetRc901aLearnedBindings":
+                        await ResetRc901aLearnedBindingsAsync();
+                        break;
+                }
+            }
+            finally
+            {
+                _gate.Release();
             }
         }
         finally
         {
-            _gate.Release();
+            if (serializesSettingsWrite)
+            {
+                _settingsWriteGate.Release();
+            }
         }
     }
+
+    private static bool CommandWritesSettings(string? type) =>
+        type is
+            "setMappingEnabled" or
+            "updateSettings" or
+            "updateMapping" or
+            "resetDefaults" or
+            "resetRc901aLearnedBindings";
 
     public void PublishCurrent()
     {
@@ -159,10 +216,20 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
             {
                 if (_runtime is null) continue;
                 var timestamp = DateTimeOffset.UtcNow;
+                if (ExpireRc901aLearning(timestamp))
+                {
+                    _rc901aAdapter?.ResetInputState();
+                }
                 var result = await _runtime.TickAsync(
                     CreateOptions(),
                     timestamp,
                     cancellationToken);
+                if (result.State.ConnectionState ==
+                        ControllerConnectionState.Disconnected &&
+                    DisconnectRc901aLearning())
+                {
+                    _rc901aAdapter?.ResetInputState();
+                }
                 var integrationChanged = PollCodexActivity(timestamp);
                 ApplyLightbarColor(timestamp);
                 if (!_stateDirty &&
@@ -198,7 +265,7 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
 
     private RuntimeOptions CreateOptions() => new(
         _settings.ActiveControllerIndex,
-        _settings.MappingEnabled,
+        _settings.MappingEnabled && !IsRc901aLearningActive(),
         _testMode,
         _settings.DeadZone,
         new ActionExecutionOptions(
@@ -222,12 +289,19 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
             new WindowsInputApi(),
             codex,
             new CodexShortcutResolver());
-        var adapter = WindowsControllerAdapterFactory.Create(_settings.ControllerType);
+        var adapter = WindowsControllerAdapterFactory.Create(
+            _settings.ControllerType,
+            _rc901aRawInputSource,
+            _settings.Rc901aLearnedBindings);
         _rc901aAdapter = adapter as Rc901aControllerAdapter;
         _rc901aStatus = _rc901aAdapter?.CurrentStatus ?? Rc901aStatus.Idle;
         if (_rc901aAdapter is not null)
         {
             _rc901aAdapter.StatusChanged += OnRc901aStatusChanged;
+            if (IsRc901aLearningActive())
+            {
+                _rc901aAdapter.ResetInputState();
+            }
         }
         _lightbar = adapter as IControllerLightbar;
         _lightbarAnimation = new CodexActivityLightbarAnimation();
@@ -242,7 +316,442 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
     {
         _rc901aStatus = status;
         _stateDirty = true;
+        if (status.ConnectionState is not (
+                Rc901aConnectionState.Connected or
+                Rc901aConnectionState.ConnectedLimited) &&
+            DisconnectRc901aLearning())
+        {
+            _rc901aAdapter?.ResetInputState();
+        }
     }
+
+    private void SubscribeToRc901aInput()
+    {
+        if (_rc901aRawInputSource is null || _rc901aInputSubscribed)
+        {
+            return;
+        }
+
+        _rc901aRawInputSource.InputReceived += OnRc901aInputReceived;
+        _rc901aInputSubscribed = true;
+    }
+
+    private void UnsubscribeFromRc901aInput()
+    {
+        if (_rc901aRawInputSource is null || !_rc901aInputSubscribed)
+        {
+            return;
+        }
+
+        _rc901aRawInputSource.InputReceived -= OnRc901aInputReceived;
+        _rc901aInputSubscribed = false;
+    }
+
+    private void OnRc901aInputReceived(Rc901aRawInputEvent input)
+    {
+        var effectiveBindings = GetEffectiveRc901aBindings();
+        var isUnknown = effectiveBindings.All(item =>
+            item.Kind != input.Kind ||
+            item.Code != input.Code);
+        var recordUnknown = isUnknown && input.IsPressed;
+        var learningChanged = false;
+        lock (_rc901aLearningGate)
+        {
+            if (recordUnknown)
+            {
+                _lastUnknownRc901aInput = new Rc901aUnknownInputSignal(
+                    input.Kind,
+                    input.Code,
+                    input.Timestamp);
+            }
+
+            learningChanged = _rc901aLearning.ObserveInput(
+                input,
+                effectiveBindings);
+        }
+
+        if (recordUnknown || learningChanged)
+        {
+            _stateDirty = true;
+        }
+    }
+
+    private void StartRc901aLearning(JsonElement payload)
+    {
+        if (_rc901aRawInputSource is null ||
+            _settings.ControllerType != ControllerType.TclRc901a ||
+            !IsRc901aConnected(_rc901aStatus) ||
+            !TryGetControl(payload, out var target))
+        {
+            return;
+        }
+        var compatibilityOverride =
+            payload.TryGetProperty(
+                "compatibilityOverride",
+                out var compatibilityOverrideElement) &&
+            compatibilityOverrideElement.ValueKind == JsonValueKind.True;
+        var now = DateTimeOffset.UtcNow;
+        if (ExpireRc901aLearning(now))
+        {
+            _rc901aAdapter?.ResetInputState(now);
+        }
+
+        string? sessionId;
+        lock (_rc901aLearningGate)
+        {
+            sessionId = _rc901aLearning.Start(
+                target,
+                now,
+                compatibilityOverride);
+        }
+
+        if (sessionId is null)
+        {
+            return;
+        }
+
+        _rc901aAdapter?.ResetInputState(now);
+        _stateDirty = true;
+    }
+
+    private async Task ConfirmRc901aLearningAsync(JsonElement payload)
+    {
+        if (!TryGetSessionId(payload, out var sessionId))
+        {
+            return;
+        }
+
+        await _settingsWriteGate.WaitAsync(_cancellation.Token);
+        CancellationTokenSource? saveCancellation = null;
+        AppSettings? previousSettings = null;
+        AppSettings? nextSettings = null;
+        try
+        {
+            await _gate.WaitAsync(_cancellation.Token);
+            try
+            {
+                var now = DateTimeOffset.UtcNow;
+                if (ExpireRc901aLearning(now))
+                {
+                    _rc901aAdapter?.ResetInputState(now);
+                    return;
+                }
+                if (!IsRc901aConnected(_rc901aStatus))
+                {
+                    if (DisconnectRc901aLearning())
+                    {
+                        _rc901aAdapter?.ResetInputState(now);
+                    }
+                    return;
+                }
+
+                Rc901aInputBinding? binding;
+                lock (_rc901aLearningGate)
+                {
+                    if (!IsRc901aConnected(_rc901aStatus) ||
+                        !_rc901aLearning.TryBeginSave(sessionId, out binding))
+                    {
+                        return;
+                    }
+                    saveCancellation =
+                        CancellationTokenSource.CreateLinkedTokenSource(
+                            _cancellation.Token);
+                    _rc901aLearningSaveCancellation = saveCancellation;
+                }
+
+                _rc901aAdapter?.ResetInputState(now);
+                _stateDirty = true;
+                previousSettings = _settings;
+                nextSettings = _settings with
+                {
+                    Rc901aLearnedBindings = Rc901aInputBindings.Upsert(
+                        _settings.Rc901aLearnedBindings,
+                        binding!),
+                };
+            }
+            finally
+            {
+                _gate.Release();
+            }
+
+            try
+            {
+                await _settingsStore.SaveAsync(
+                    nextSettings!,
+                    saveCancellation!.Token);
+
+                var commitAccepted = false;
+                var abandonedCurrentSave = false;
+                await _gate.WaitAsync(_cancellation.Token);
+                try
+                {
+                    lock (_rc901aLearningGate)
+                    {
+                        if (_rc901aLearning.CanCompleteSave(sessionId) &&
+                            IsRc901aConnected(_rc901aStatus))
+                        {
+                            commitAccepted =
+                                _rc901aLearning.CompleteSave(sessionId);
+                            if (commitAccepted)
+                            {
+                                _settings = nextSettings!;
+                            }
+                        }
+                        else
+                        {
+                            abandonedCurrentSave =
+                                _rc901aLearning.Cancel(sessionId);
+                        }
+                    }
+
+                    if (commitAccepted)
+                    {
+                        RebuildRuntime();
+                    }
+                    if (commitAccepted || abandonedCurrentSave)
+                    {
+                        _rc901aAdapter?.ResetInputState();
+                        _stateDirty = true;
+                    }
+                }
+                finally
+                {
+                    _gate.Release();
+                }
+
+                if (!commitAccepted)
+                {
+                    await RestoreRc901aSettingsAsync(previousSettings!);
+                }
+            }
+            catch (OperationCanceledException) when (
+                saveCancellation!.IsCancellationRequested &&
+                !_cancellation.IsCancellationRequested)
+            {
+                await RestoreRc901aSettingsAsync(previousSettings!);
+            }
+            catch
+            {
+                await AbortRc901aLearningSaveAsync(sessionId);
+                throw;
+            }
+        }
+        finally
+        {
+            if (saveCancellation is not null)
+            {
+                ClearRc901aLearningSaveCancellation(saveCancellation);
+            }
+            _settingsWriteGate.Release();
+        }
+    }
+
+    private async Task AbortRc901aLearningSaveAsync(string sessionId)
+    {
+        await _gate.WaitAsync(_cancellation.Token);
+        try
+        {
+            var aborted = false;
+            lock (_rc901aLearningGate)
+            {
+                aborted = _rc901aLearning.Cancel(sessionId);
+            }
+            if (aborted)
+            {
+                _rc901aAdapter?.ResetInputState();
+                _stateDirty = true;
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
+    private void RetryRc901aLearning(JsonElement payload)
+    {
+        if (!TryGetSessionId(payload, out var sessionId))
+        {
+            return;
+        }
+        var now = DateTimeOffset.UtcNow;
+        if (ExpireRc901aLearning(now))
+        {
+            _rc901aAdapter?.ResetInputState(now);
+            return;
+        }
+
+        bool retried;
+        lock (_rc901aLearningGate)
+        {
+            retried = _rc901aLearning.Retry(
+                sessionId,
+                now);
+        }
+
+        if (!retried)
+        {
+            return;
+        }
+
+        _rc901aAdapter?.ResetInputState(now);
+        _stateDirty = true;
+    }
+
+    private void CancelRc901aLearning(JsonElement payload)
+    {
+        if (!TryGetSessionId(payload, out var sessionId))
+        {
+            return;
+        }
+
+        bool cancelled;
+        lock (_rc901aLearningGate)
+        {
+            cancelled = _rc901aLearning.Cancel(sessionId);
+            if (cancelled)
+            {
+                _rc901aLearningSaveCancellation?.Cancel();
+            }
+        }
+
+        if (!cancelled)
+        {
+            return;
+        }
+
+        _rc901aAdapter?.ResetInputState();
+        _stateDirty = true;
+    }
+
+    private async Task ResetRc901aLearnedBindingsAsync()
+    {
+        if (_settings.Rc901aLearnedBindings.Count == 0)
+        {
+            return;
+        }
+
+        var nextSettings = _settings with
+        {
+            Rc901aLearnedBindings = [],
+        };
+        await _settingsStore.SaveAsync(
+            nextSettings,
+            _cancellation.Token);
+        _settings = nextSettings;
+        _rc901aAdapter?.ResetInputState();
+        RebuildRuntime();
+        _stateDirty = true;
+    }
+
+    private bool ExpireRc901aLearning(DateTimeOffset now)
+    {
+        lock (_rc901aLearningGate)
+        {
+            if (!_rc901aLearning.Expire(now))
+            {
+                return false;
+            }
+            _rc901aLearningSaveCancellation?.Cancel();
+        }
+
+        _stateDirty = true;
+        return true;
+    }
+
+    private bool DisconnectRc901aLearning()
+    {
+        lock (_rc901aLearningGate)
+        {
+            if (!_rc901aLearning.Disconnect())
+            {
+                return false;
+            }
+            _rc901aLearningSaveCancellation?.Cancel();
+        }
+
+        _stateDirty = true;
+        return true;
+    }
+
+    private Task RestoreRc901aSettingsAsync(AppSettings settings) =>
+        _settingsStore.SaveAsync(settings, _cancellation.Token);
+
+    private void ClearRc901aLearningSaveCancellation(
+        CancellationTokenSource saveCancellation)
+    {
+        lock (_rc901aLearningGate)
+        {
+            if (ReferenceEquals(
+                    _rc901aLearningSaveCancellation,
+                    saveCancellation))
+            {
+                _rc901aLearningSaveCancellation = null;
+            }
+        }
+        saveCancellation.Dispose();
+    }
+
+    private bool IsRc901aLearningActive()
+    {
+        lock (_rc901aLearningGate)
+        {
+            return _rc901aLearning.IsActive;
+        }
+    }
+
+    private Rc901aInputStatus? BuildRc901aInputStatus()
+    {
+        if (_rc901aRawInputSource is null)
+        {
+            return null;
+        }
+
+        lock (_rc901aLearningGate)
+        {
+            return new Rc901aInputStatus(
+                GetEffectiveRc901aBindings(),
+                _lastUnknownRc901aInput,
+                _rc901aLearning.Status);
+        }
+    }
+
+    private IReadOnlyList<Rc901aInputBinding>
+        GetEffectiveRc901aBindings() =>
+        Rc901aInputBindings.CombineWithVerifiedDefaults(
+            _settings.Rc901aLearnedBindings);
+
+    private static bool TryGetControl(
+        JsonElement payload,
+        out ControllerControl control)
+    {
+        control = default;
+        return payload.ValueKind == JsonValueKind.Object &&
+               payload.TryGetProperty("control", out var element) &&
+               element.ValueKind == JsonValueKind.String &&
+               TryControl(element.GetString() ?? string.Empty, out control);
+    }
+
+    private static bool TryGetSessionId(
+        JsonElement payload,
+        out string sessionId)
+    {
+        sessionId = string.Empty;
+        if (payload.ValueKind != JsonValueKind.Object ||
+            !payload.TryGetProperty("sessionId", out var element) ||
+            element.ValueKind != JsonValueKind.String)
+        {
+            return false;
+        }
+
+        sessionId = element.GetString() ?? string.Empty;
+        return !string.IsNullOrWhiteSpace(sessionId);
+    }
+
+    private static bool IsRc901aConnected(Rc901aStatus status) =>
+        status.ConnectionState is
+            Rc901aConnectionState.Connected or
+            Rc901aConnectionState.ConnectedLimited;
 
     private async Task UpdateSettingsAsync(JsonElement payload)
     {
@@ -256,6 +765,12 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
                 out var parsedControllerType))
         {
             controllerType = parsedControllerType;
+        }
+
+        if (controllerType != previousControllerType &&
+            DisconnectRc901aLearning())
+        {
+            _rc901aAdapter?.ResetInputState();
         }
 
         _settings = _settings with
@@ -412,7 +927,8 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
         _microphoneStatus,
         _codexHookStatus,
         _codexActivity,
-        _rc901aStatus);
+        _rc901aStatus,
+        BuildRc901aInputStatus());
 
     private void RefreshIntegrations()
     {
@@ -502,12 +1018,20 @@ public sealed class ControllerRuntimeService : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        UnsubscribeFromRc901aInput();
         _cancellation.Cancel();
         if (_loop is not null)
         {
             try { await _loop; } catch (OperationCanceledException) { }
         }
+        if (_rc901aAdapter is not null)
+        {
+            _rc901aAdapter.StatusChanged -= OnRc901aStatusChanged;
+            _rc901aAdapter = null;
+        }
         _runtime?.Dispose();
+        _runtime = null;
+        _settingsWriteGate.Dispose();
         _gate.Dispose();
         _cancellation.Dispose();
     }

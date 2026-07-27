@@ -93,6 +93,104 @@ public sealed class BridgeMessageTests
     }
 
     [Fact]
+    public void RuntimeStateMessage_SerializesCamelCaseRc901aInputStatus()
+    {
+        var timestamp = DateTimeOffset.Parse("2026-07-26T12:00:00Z");
+        var learning = new Rc901aLearningStatus(
+            Rc901aLearningPhase.Review,
+            "opaque-session",
+            ControllerControl.RemoteBack,
+            new Rc901aInputSignal(
+                Rc901aRawInputKind.ConsumerControl,
+                0x0224),
+            new Rc901aLearningConflict(
+                ControllerControl.RemoteHome,
+                Rc901aBindingSource.Learned),
+            timestamp.AddSeconds(30));
+        var inputStatus = new Rc901aInputStatus(
+            Rc901aInputBindings.CombineWithVerifiedDefaults(
+            [
+                new(
+                    Rc901aRawInputKind.ConsumerControl,
+                    0x0224,
+                    ControllerControl.RemoteHome,
+                    Rc901aBindingSource.Learned),
+            ]),
+            new Rc901aUnknownInputSignal(
+                Rc901aRawInputKind.ConsumerControl,
+                0x0225,
+                timestamp),
+            learning);
+        var configuration = new RuntimeConfigurationPayload(
+            ControllerType.TclRc901a,
+            ActiveControllerIndex: 0,
+            CodexOnly: true,
+            DictationShortcut: "Ctrl+Alt+Shift+F12",
+            MouseSpeed: 50,
+            ScrollSpeed: 50,
+            DeadZone: 0.12f,
+            StartWithWindows: false,
+            Mappings: new Dictionary<string, string>(),
+            Rc901aInput: inputStatus);
+        var state = new RuntimeState(
+            ControllerConnectionState.Connected,
+            ControllerIndex: 0,
+            MappingEnabled: false,
+            TestMode: false,
+            PacketNumber: 2,
+            Snapshot: ControllerSnapshot.Empty);
+
+        var json = BridgeJson.Serialize(
+            BridgeMessageFactory.RuntimeState(state, null, configuration));
+        using var document = JsonDocument.Parse(json);
+        var root = document.RootElement;
+        var serialized = root
+            .GetProperty("payload")
+            .GetProperty("configuration")
+            .GetProperty("rc901aInput");
+
+        Assert.Equal(1, root.GetProperty("version").GetInt32());
+        Assert.Equal(28, serialized.GetProperty("bindings").GetArrayLength());
+        Assert.Equal(
+            "verifiedDefault",
+            serialized
+                .GetProperty("bindings")[0]
+                .GetProperty("source")
+                .GetString());
+        Assert.Equal(
+            "consumerControl",
+            serialized
+                .GetProperty("lastUnknown")
+                .GetProperty("kind")
+                .GetString());
+        var serializedLearning = serialized.GetProperty("learning");
+        Assert.Equal(
+            "review",
+            serializedLearning.GetProperty("phase").GetString());
+        Assert.Equal(
+            "remoteBack",
+            serializedLearning.GetProperty("target").GetString());
+        Assert.Equal(
+            0x0224,
+            serializedLearning
+                .GetProperty("candidate")
+                .GetProperty("code")
+                .GetInt32());
+        Assert.Equal(
+            "remoteHome",
+            serializedLearning
+                .GetProperty("conflict")
+                .GetProperty("control")
+                .GetString());
+        Assert.Equal(
+            "learned",
+            serializedLearning
+                .GetProperty("conflict")
+                .GetProperty("source")
+                .GetString());
+    }
+
+    [Fact]
     public void RuntimeStateMessage_SerializesMicrophoneAndCodexHookStatus()
     {
         var state = new RuntimeState(

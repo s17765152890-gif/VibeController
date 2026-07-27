@@ -146,4 +146,35 @@ public sealed class DefaultProfileFactoryTests
 
         Assert.Equal(MappedActionKind.None, profile.Mappings[control].Kind);
     }
+
+    [Theory]
+    [InlineData(ControllerControl.RemotePower)]
+    [InlineData(ControllerControl.RemoteInput)]
+    [InlineData(ControllerControl.RemoteRed)]
+    [InlineData(ControllerControl.RemoteGreen)]
+    [InlineData(ControllerControl.RemoteBlue)]
+    [InlineData(ControllerControl.RemoteSettings)]
+    [InlineData(ControllerControl.RemoteApp1)]
+    [InlineData(ControllerControl.RemoteApp2)]
+    [InlineData(ControllerControl.RemoteBrightnessUp)]
+    [InlineData(ControllerControl.RemoteBrightnessDown)]
+    [InlineData(ControllerControl.RemotePictureMode)]
+    public void Create_LeavesPhotographedRc901aControlsUnassigned(
+        ControllerControl control)
+    {
+        var profile = DefaultProfileFactory.Create();
+
+        Assert.Equal(MappedActionKind.None, profile.Mappings[control].Kind);
+    }
+
+    [Fact]
+    public void ControllerControl_AppendsPhotographedControlsAfterLegacyRemoteValues()
+    {
+        Assert.Equal(
+            (int)ControllerControl.RemoteDigit9 + 1,
+            (int)ControllerControl.RemotePower);
+        Assert.Equal(
+            (int)ControllerControl.RemotePower + 7,
+            (int)ControllerControl.RemoteApp2);
+    }
 }

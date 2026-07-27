@@ -25,6 +25,10 @@ public sealed class MappingEngineTests
     [Theory]
     [InlineData(ControllerControl.DPadDown, MappedActionKind.KeyboardShortcut, "ArrowDown")]
     [InlineData(ControllerControl.RightStickLeft, MappedActionKind.KeyboardShortcut, "ArrowLeft")]
+    [InlineData(ControllerControl.RemoteUp, MappedActionKind.KeyboardShortcut, "ArrowUp")]
+    [InlineData(ControllerControl.RemoteDown, MappedActionKind.KeyboardShortcut, "ArrowDown")]
+    [InlineData(ControllerControl.RemoteLeft, MappedActionKind.KeyboardShortcut, "ArrowLeft")]
+    [InlineData(ControllerControl.RemoteRight, MappedActionKind.KeyboardShortcut, "ArrowRight")]
     public void Resolve_AllowsRepeatForDigitalAndSemanticNavigationControls(
         ControllerControl control,
         MappedActionKind expectedKind,

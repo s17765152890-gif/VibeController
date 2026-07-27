@@ -21,6 +21,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WPF" />
+    <ProjectReference Include="..\..\src\VibeController.App\VibeController.App.csproj" />
     <ProjectReference Include="..\..\src\VibeController.Infrastructure\VibeController.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\VibeController.Core\VibeController.Core.csproj" />
   </ItemGroup>
