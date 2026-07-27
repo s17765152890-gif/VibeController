@@ -116,8 +116,18 @@ public sealed class WindowsRc901aDriverInputClient :
             }
 
             var timestamp = DateTimeOffset.UtcNow;
-            if (_hasSnapshot &&
-                snapshot.TotalReports < _lastTotalReports)
+            if (!_hasSnapshot)
+            {
+                SetAvailability(isAvailable: true);
+                _lastSequence = snapshot.Reports.Count > 0
+                    ? snapshot.Reports.Max(report => report.Sequence)
+                    : 0;
+                _lastTotalReports = snapshot.TotalReports;
+                _hasSnapshot = true;
+                return;
+            }
+
+            if (snapshot.TotalReports < _lastTotalReports)
             {
                 Publish(_decoder.Reset(timestamp));
                 _lastSequence = 0;
@@ -155,6 +165,9 @@ public sealed class WindowsRc901aDriverInputClient :
     private void MarkUnavailable()
     {
         Publish(_decoder.Reset(DateTimeOffset.UtcNow));
+        _lastSequence = 0;
+        _lastTotalReports = 0;
+        _hasSnapshot = false;
         SetAvailability(isAvailable: false);
     }
 

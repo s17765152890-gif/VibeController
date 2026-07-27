@@ -7,7 +7,7 @@ namespace VibeController.Infrastructure.Tests.Windows;
 public sealed class WindowsRc901aDriverInputClientTests
 {
     [Fact]
-    public async Task RefreshAsync_DeliversTheInitialSnapshot()
+    public async Task RefreshAsync_BaselinesTheInitialSnapshotWithoutReplayingIt()
     {
         var transport = new FakeTransport();
         transport.Enqueue(BuildSnapshot(
@@ -19,26 +19,51 @@ public sealed class WindowsRc901aDriverInputClientTests
 
         await client.RefreshAsync(CancellationToken.None);
 
+        Assert.Empty(received);
+        Assert.True(client.IsAvailable);
+    }
+
+    [Fact]
+    public async Task RefreshAsync_DeliversOnlyReportsNewerThanTheInitialBaseline()
+    {
+        var transport = new FakeTransport();
+        transport.Enqueue(BuildSnapshot(
+            totalReports: 1,
+            (1, new byte[] { 0x01, 0, 0, 0xF1 })));
+        transport.Enqueue(BuildSnapshot(
+            totalReports: 2,
+            (1, new byte[] { 0x01, 0, 0, 0xF1 }),
+            (2, new byte[] { 0x01, 0, 0, 0x52 })));
+        await using var client = CreateClient(transport);
+        var received = new List<Rc901aRawInputEvent>();
+        client.InputReceived += received.Add;
+
+        await client.RefreshAsync(CancellationToken.None);
+        await client.RefreshAsync(CancellationToken.None);
+
         var input = Assert.Single(received);
         Assert.Equal(Rc901aRawInputKind.DriverHidUsage, input.Kind);
-        Assert.Equal((ushort)0xF1, input.Code);
+        Assert.Equal((ushort)0x52, input.Code);
         Assert.True(input.IsPressed);
-        Assert.True(client.IsAvailable);
     }
 
     [Fact]
     public async Task RefreshAsync_DeduplicatesSequencesAcrossSnapshots()
     {
+        var baseline = BuildSnapshot(
+            totalReports: 0);
         var snapshot = BuildSnapshot(
             totalReports: 1,
             (1, new byte[] { 0x01, 0, 0, 0x52 }));
         var transport = new FakeTransport();
+        transport.Enqueue(baseline);
         transport.Enqueue(snapshot);
         transport.Enqueue(snapshot);
         await using var client = CreateClient(transport);
         var received = new List<Rc901aRawInputEvent>();
         client.InputReceived += received.Add;
 
+        await client.RefreshAsync(CancellationToken.None);
         await client.RefreshAsync(CancellationToken.None);
         await client.RefreshAsync(CancellationToken.None);
 
@@ -64,16 +89,6 @@ public sealed class WindowsRc901aDriverInputClientTests
 
         Assert.Collection(
             received,
-            first =>
-            {
-                Assert.Equal((ushort)0x50, first.Code);
-                Assert.True(first.IsPressed);
-            },
-            releasedAfterRestart =>
-            {
-                Assert.Equal((ushort)0x50, releasedAfterRestart.Code);
-                Assert.False(releasedAfterRestart.IsPressed);
-            },
             next =>
             {
                 Assert.Equal((ushort)0x4F, next.Code);
@@ -98,6 +113,33 @@ public sealed class WindowsRc901aDriverInputClientTests
 
         Assert.Equal([true, false, true], availability);
         Assert.True(client.IsAvailable);
+    }
+
+    [Fact]
+    public async Task RefreshAsync_BaselinesBufferedReportsAfterReconnect()
+    {
+        var transport = new FakeTransport();
+        transport.Enqueue(BuildSnapshot(totalReports: 0));
+        transport.EnqueueMissing();
+        transport.Enqueue(BuildSnapshot(
+            totalReports: 1,
+            (1, new byte[] { 0x01, 0, 0, 0xF1 })));
+        transport.Enqueue(BuildSnapshot(
+            totalReports: 2,
+            (1, new byte[] { 0x01, 0, 0, 0xF1 }),
+            (2, new byte[] { 0x01, 0, 0, 0x52 })));
+        await using var client = CreateClient(transport);
+        var received = new List<Rc901aRawInputEvent>();
+        client.InputReceived += received.Add;
+
+        await client.RefreshAsync(CancellationToken.None);
+        await client.RefreshAsync(CancellationToken.None);
+        await client.RefreshAsync(CancellationToken.None);
+        await client.RefreshAsync(CancellationToken.None);
+
+        var input = Assert.Single(received);
+        Assert.Equal((ushort)0x52, input.Code);
+        Assert.True(input.IsPressed);
     }
 
     [Fact]
