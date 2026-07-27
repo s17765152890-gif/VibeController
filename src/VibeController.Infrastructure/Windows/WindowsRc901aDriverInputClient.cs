@@ -249,36 +249,47 @@ public sealed class WindowsRc901aDriverSnapshotTransport :
     private static readonly Guid InterfaceClassGuid =
         new("34826b0c-f006-44e1-ae98-a584b68c4ec1");
 
+    private readonly WindowsRc901aDriverRegistrySnapshotReader
+        _registrySnapshotReader = new();
     private SafeFileHandle? _handle;
+    private long _nextInterfaceOpenAttempt;
+    private bool _interfacePresent;
     private bool _disposed;
 
     public bool TryReadSnapshot(out byte[] snapshotBytes)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         snapshotBytes = [];
-        if (!EnsureOpen())
+        if (EnsureOpen())
         {
-            return false;
-        }
+            var buffer = new byte[SnapshotBufferSize];
+            if (DeviceIoControl(
+                    _handle!,
+                    IoctlGetInputReports,
+                    IntPtr.Zero,
+                    0,
+                    buffer,
+                    buffer.Length,
+                    out var bytesReturned,
+                    IntPtr.Zero) &&
+                bytesReturned >= Rc901aDriverSnapshotParser.HeaderSize)
+            {
+                snapshotBytes = buffer[..(int)bytesReturned];
+                return true;
+            }
 
-        var buffer = new byte[SnapshotBufferSize];
-        if (!DeviceIoControl(
-                _handle!,
-                IoctlGetInputReports,
-                IntPtr.Zero,
-                0,
-                buffer,
-                buffer.Length,
-                out var bytesReturned,
-                IntPtr.Zero) ||
-            bytesReturned < Rc901aDriverSnapshotParser.HeaderSize)
-        {
             CloseHandle();
+            _nextInterfaceOpenAttempt =
+                Environment.TickCount64 + 1_000;
+        }
+
+        if (!_interfacePresent)
+        {
             return false;
         }
 
-        snapshotBytes = buffer[..(int)bytesReturned];
-        return true;
+        return _registrySnapshotReader.TryReadSnapshot(
+            out snapshotBytes);
     }
 
     private bool EnsureOpen()
@@ -289,7 +300,16 @@ public sealed class WindowsRc901aDriverSnapshotTransport :
         }
 
         CloseHandle();
-        foreach (var path in EnumerateDeviceInterfacePaths())
+        var now = Environment.TickCount64;
+        if (now < _nextInterfaceOpenAttempt)
+        {
+            return false;
+        }
+
+        var paths = EnumerateDeviceInterfacePaths();
+        _interfacePresent = paths.Count > 0;
+        _nextInterfaceOpenAttempt = now + 1_000;
+        foreach (var path in paths)
         {
             var handle = CreateFileW(
                 path,
@@ -302,6 +322,7 @@ public sealed class WindowsRc901aDriverSnapshotTransport :
             if (!handle.IsInvalid)
             {
                 _handle = handle;
+                _nextInterfaceOpenAttempt = 0;
                 return true;
             }
 
@@ -357,6 +378,7 @@ public sealed class WindowsRc901aDriverSnapshotTransport :
 
         _disposed = true;
         CloseHandle();
+        _registrySnapshotReader.Dispose();
     }
 
     [DllImport("cfgmgr32.dll", CharSet = CharSet.Unicode)]
