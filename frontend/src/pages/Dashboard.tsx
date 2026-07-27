@@ -47,7 +47,7 @@ export function Dashboard({ state, onToggleMapping, onToggleTestMode }: Dashboar
           <div className="controller-meta">
             <span>{presentation.name}</span>
             <span>{controllerType === "tclRc901a"
-              ? `直接 BLE · 数据包 ${state.packetNumber}`
+              ? `Windows HID · 数据包 ${state.packetNumber}`
               : `控制器 ${state.controllerIndex + 1} · 数据包 ${state.packetNumber}`}</span>
           </div>
           <ControllerVisual controllerType={controllerType} controls={state.controls} />

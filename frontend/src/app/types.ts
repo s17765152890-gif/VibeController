@@ -10,6 +10,81 @@ export type Rc901aConnectionState =
   | "connectedLimited"
   | "disconnected"
   | "error";
+export type Rc901aRawInputKind =
+  | "keyboard"
+  | "consumerControl"
+  | "driverHidUsage";
+export type Rc901aBindingSource = "verifiedDefault" | "learned";
+export type Rc901aLearningPhase =
+  | "idle"
+  | "awaitingPress"
+  | "awaitingRelease"
+  | "review"
+  | "saving";
+
+export type Rc901aControl =
+  | "remotePower"
+  | "remoteMute"
+  | "remoteInput"
+  | "remoteRed"
+  | "remoteGreen"
+  | "remoteBlue"
+  | "remoteUp"
+  | "remoteLeft"
+  | "remoteOk"
+  | "remoteRight"
+  | "remoteDown"
+  | "remoteBack"
+  | "remoteVolumeUp"
+  | "remoteHome"
+  | "remoteMenu"
+  | "remoteVolumeDown"
+  | "remoteSettings"
+  | "remoteApp1"
+  | "remoteApp2"
+  | "remoteMic"
+  | "remoteBrightnessUp"
+  | "remoteBrightnessDown"
+  | "remotePictureMode";
+
+export type Rc901aLearnableControl = Exclude<
+  Rc901aControl,
+  "remotePower"
+>;
+
+export interface Rc901aInputSignal {
+  kind: Rc901aRawInputKind;
+  code: number;
+}
+
+export interface Rc901aUnknownInputSignal extends Rc901aInputSignal {
+  timestamp: string;
+}
+
+export interface Rc901aInputBinding extends Rc901aInputSignal {
+  control: string;
+  source: Rc901aBindingSource;
+}
+
+export interface Rc901aLearningConflict {
+  control: string;
+  source: Rc901aBindingSource;
+}
+
+export interface Rc901aLearningStatus {
+  phase: Rc901aLearningPhase;
+  sessionId: string | null;
+  target: string | null;
+  candidate: Rc901aInputSignal | null;
+  conflict: Rc901aLearningConflict | null;
+  expiresAt: string | null;
+}
+
+export interface Rc901aInputStatus {
+  bindings: Rc901aInputBinding[];
+  lastUnknown: Rc901aUnknownInputSignal | null;
+  learning: Rc901aLearningStatus;
+}
 
 export interface Rc901aPacketSample {
   timestamp: string;
@@ -75,6 +150,7 @@ export interface RuntimeConfiguration {
   codexHook?: CodexHookRegistrationStatus;
   codexActivity?: CodexActivityStatus;
   rc901a?: Rc901aStatus;
+  rc901aInput?: Rc901aInputStatus;
 }
 
 export interface RuntimeStateMessage {
@@ -94,6 +170,11 @@ export type CommandType =
   | "refreshIntegrations"
   | "refreshRc901a"
   | "clearRc901aSamples"
+  | "startRc901aLearning"
+  | "confirmRc901aLearning"
+  | "retryRc901aLearning"
+  | "cancelRc901aLearning"
+  | "resetRc901aLearnedBindings"
   | "requestState";
 
 export interface BridgeCommand<TPayload = unknown> {

@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { Battery, Bluetooth, Clipboard, Gamepad2, Lightbulb, Mic2, Radio, RefreshCw, Save, Trash2 } from "lucide-react";
 import { SliderField } from "../components/SliderField";
+import { Rc901aLearningPanel } from "../components/Rc901aLearningPanel";
 import { rc901aPairingInstruction } from "../app/controllerPresentation";
 import type {
   CodexActivityStatus,
   CodexHookRegistrationStatus,
   ControllerType,
   MicrophoneStatus,
+  Rc901aInputStatus,
+  Rc901aLearnableControl,
   Rc901aStatus,
 } from "../app/types";
 
@@ -28,11 +31,22 @@ interface SettingsProps {
   onRefreshIntegrations?(): void;
   onRefreshRc901a?(): void;
   onClearRc901aSamples?(): void;
+  onStartRc901aLearning?(
+    control: Rc901aLearnableControl,
+    compatibilityOverride: true,
+  ): void;
+  onConfirmRc901aLearning?(sessionId: string): void;
+  onRetryRc901aLearning?(sessionId: string): void;
+  onCancelRc901aLearning?(sessionId: string): void;
+  onResetRc901aLearnedBindings?(): void;
   initialValues?: SettingsValues;
+  persistedControllerType?: ControllerType;
+  rc901aLearningReady?: boolean;
   microphone?: MicrophoneStatus;
   codexHook?: CodexHookRegistrationStatus;
   codexActivity?: CodexActivityStatus;
   rc901a?: Rc901aStatus;
+  rc901aInput?: Rc901aInputStatus;
 }
 
 const defaultSettings: SettingsValues = {
@@ -60,11 +74,19 @@ export function Settings({
   onRefreshIntegrations,
   onRefreshRc901a,
   onClearRc901aSamples,
+  onStartRc901aLearning,
+  onConfirmRc901aLearning,
+  onRetryRc901aLearning,
+  onCancelRc901aLearning,
+  onResetRc901aLearnedBindings,
   initialValues,
+  persistedControllerType,
+  rc901aLearningReady = false,
   microphone,
   codexHook,
   codexActivity,
   rc901a,
+  rc901aInput,
 }: SettingsProps) {
   const [values, setValues] = useState<SettingsValues>(initialValues ?? defaultSettings);
   const update = <K extends keyof SettingsValues>(key: K, value: SettingsValues[K]) =>
@@ -84,13 +106,20 @@ export function Settings({
     idle: "等待连接",
     scanning: "正在查找",
     connecting: "正在连接",
-    connected: "直接 BLE 已连接",
+    connected: "Windows HID 已连接",
     connectedLimited: "部分通道可用",
     disconnected: "已断开",
     error: "连接异常",
   } as const;
   const rc901aState = rc901a?.connectionState ?? "idle";
   const rc901aSamples = rc901a?.samples ?? [];
+  const rc901aSelectionSaved = persistedControllerType === "tclRc901a";
+  const rc901aLearningEnabled = rc901aSelectionSaved && rc901aLearningReady;
+  const rc901aLearningUnavailableReason = !rc901aSelectionSaved
+    ? "先保存设备设置"
+    : !rc901aLearningReady
+      ? "先连接遥控器"
+      : undefined;
 
   return (
     <main className="workspace-page settings-page">
@@ -142,7 +171,7 @@ export function Settings({
               <label className="device-family-option" data-selected={values.controllerType === "tclRc901a"}>
                 <input aria-label="TCL RC901A" type="radio" name="controllerType" value="tclRc901a" checked={values.controllerType === "tclRc901a"} onChange={() => update("controllerType", "tclRc901a")} />
                 <span className="device-family-icon device-family-icon--remote"><Radio size={19} /></span>
-                <span><strong>TCL RC901A</strong><small>直接 BLE · BT_RC901A_B1</small></span>
+                <span><strong>TCL RC901A</strong><small>Windows HID · BT_RC901A_B1</small></span>
                 <span className="selection-dot" aria-hidden="true" />
               </label>
             </div>
@@ -160,46 +189,58 @@ export function Settings({
             <span><strong>自动同步 Codex 快捷键</strong><small>首次触发 Codex 操作时读取当前用户的设置；之后修改会自动刷新，无需重新映射。</small></span>
           </div>
           {values.controllerType === "tclRc901a" && (
-            <section className="rc901a-direct-panel" aria-label="RC901A 直接 BLE 状态">
-              <div className="rc901a-panel-heading">
-                <div className="rc901a-device-identity">
-                  <span className="rc901a-device-icon" aria-hidden="true"><Bluetooth size={18} /></span>
-                  <div>
-                    <small>直接 BLE 模式</small>
-                    <strong>{rc901a?.deviceName ?? "BT_RC901A_B1"}</strong>
+            <>
+              <section className="rc901a-direct-panel" aria-label="RC901A Windows HID 状态">
+                <div className="rc901a-panel-heading">
+                  <div className="rc901a-device-identity">
+                    <span className="rc901a-device-icon" aria-hidden="true"><Bluetooth size={18} /></span>
+                    <div>
+                      <small>Windows HID</small>
+                      <strong>{rc901a?.deviceName ?? "BT_RC901A_B1"}</strong>
+                    </div>
                   </div>
+                  <span className="rc901a-state" data-state={rc901aState}>{rc901aConnectionLabels[rc901aState]}</span>
                 </div>
-                <span className="rc901a-state" data-state={rc901aState}>{rc901aConnectionLabels[rc901aState]}</span>
-              </div>
 
-              <div className="rc901a-metrics">
-                <span><Battery size={14} />{rc901a?.batteryPercent == null ? "电量未知" : `${rc901a.batteryPercent}% 电量`}</span>
-                <span><Radio size={14} />{rc901a?.subscribedCharacteristicCount ?? 0} 个数据通道</span>
-              </div>
-              <p className="rc901a-message">{rc901a?.message ?? "保存设置后，VibeController 会查找已配对的遥控器。"}</p>
-              <p className="rc901a-guidance">{rc901aPairingInstruction} Windows HID 驱动不可用不影响 VibeController 直接 BLE 连接。麦克风键可触发 Codex 听写；遥控器自身音频暂未启用。</p>
+                <div className="rc901a-metrics">
+                  <span><Battery size={14} />{rc901a?.batteryPercent == null ? "电量未知" : `${rc901a.batteryPercent}% 电量`}</span>
+                  <span><Radio size={14} />{rc901a?.subscribedCharacteristicCount ?? 0} 个数据通道</span>
+                </div>
+                <p className="rc901a-message">{rc901a?.message ?? "保存设置后，VibeController 会查找已配对的遥控器。"}</p>
+                <p className="rc901a-guidance">{rc901aPairingInstruction} 专用驱动连接后，22 个已验证按键会自动就绪，无需逐键学习。麦克风键可在映射后触发 Codex 听写；遥控器自身音频暂未启用。</p>
 
-              <div className="rc901a-actions">
-                <button className="quiet-button" type="button" onClick={onRefreshRc901a} disabled={!onRefreshRc901a}><RefreshCw size={14} />重新连接</button>
-                <button className="quiet-button" type="button" onClick={onClearRc901aSamples} disabled={!onClearRc901aSamples || rc901aSamples.length === 0}><Trash2 size={14} />清除记录</button>
-              </div>
+                <div className="rc901a-actions">
+                  <button className="quiet-button" type="button" onClick={onRefreshRc901a} disabled={!onRefreshRc901a}><RefreshCw size={14} />重新连接</button>
+                  <button className="quiet-button" type="button" onClick={onClearRc901aSamples} disabled={!onClearRc901aSamples || rc901aSamples.length === 0}><Trash2 size={14} />清除记录</button>
+                </div>
 
-              <details className="rc901a-packet-log" open={rc901aSamples.length > 0}>
-                <summary>原始蓝牙数据 <span>{rc901aSamples.length}</span></summary>
-                {rc901aSamples.length === 0 ? (
-                  <p>连接后按下遥控器按键，这里会显示只读数据。</p>
-                ) : (
-                  <ol>
-                    {[...rc901aSamples].reverse().map((sample, index) => (
-                      <li key={`${sample.timestamp}-${sample.characteristicUuid}-${index}`}>
-                        <code>{sample.dataHex || "∅"}</code>
-                        <span>{sample.characteristicUuid.slice(4, 8).toUpperCase()} · {sample.length} B</span>
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </details>
-            </section>
+                <details className="rc901a-packet-log" open={rc901aSamples.length > 0}>
+                  <summary>原始输入数据 <span>{rc901aSamples.length}</span></summary>
+                  {rc901aSamples.length === 0 ? (
+                    <p>连接后按下遥控器按键，这里会显示只读数据。</p>
+                  ) : (
+                    <ol>
+                      {[...rc901aSamples].reverse().map((sample, index) => (
+                        <li key={`${sample.timestamp}-${sample.characteristicUuid}-${index}`}>
+                          <code>{sample.dataHex || "∅"}</code>
+                          <span>{sample.characteristicUuid.slice(4, 8).toUpperCase()} · {sample.length} B</span>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </details>
+              </section>
+              <Rc901aLearningPanel
+                inputStatus={rc901aInput}
+                learningEnabled={rc901aLearningEnabled}
+                learningUnavailableReason={rc901aLearningUnavailableReason}
+                onStart={onStartRc901aLearning}
+                onConfirm={onConfirmRc901aLearning}
+                onRetry={onRetryRc901aLearning}
+                onCancel={onCancelRc901aLearning}
+                onReset={onResetRc901aLearnedBindings}
+              />
+            </>
           )}
         </section>
 

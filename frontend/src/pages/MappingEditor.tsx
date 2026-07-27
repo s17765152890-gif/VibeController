@@ -21,10 +21,11 @@ const defaults: MappingValues = {
   remoteUp: "keyboardShortcut", remoteDown: "keyboardShortcut",
   remoteLeft: "keyboardShortcut", remoteRight: "keyboardShortcut",
   remoteVolumeUp: "none", remoteVolumeDown: "none", remoteMute: "none",
-  remoteChannelUp: "none", remoteChannelDown: "none",
-  remoteDigit0: "none", remoteDigit1: "none", remoteDigit2: "none",
-  remoteDigit3: "none", remoteDigit4: "none", remoteDigit5: "none",
-  remoteDigit6: "none", remoteDigit7: "none", remoteDigit8: "none", remoteDigit9: "none",
+  remotePower: "none", remoteInput: "none",
+  remoteRed: "none", remoteGreen: "none", remoteBlue: "none",
+  remoteSettings: "none", remoteApp1: "none", remoteApp2: "none",
+  remoteBrightnessUp: "none", remoteBrightnessDown: "none",
+  remotePictureMode: "none",
 };
 
 const defaultShortcuts: Record<string, string> = {

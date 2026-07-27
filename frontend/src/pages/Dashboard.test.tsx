@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Dashboard } from "./Dashboard";
 import type { RuntimeStatePayload } from "../app/types";
+import globalStyles from "../styles/global.css?raw";
 
 const connectedState: RuntimeStatePayload = {
   connectionState: "connected",
@@ -12,6 +13,29 @@ const connectedState: RuntimeStatePayload = {
   controls: { x: 1, a: 0, leftStickX: 0.25, leftTrigger: 1, leftStickButton: 1 },
   lastAction: "X → 切换听写快捷键",
 };
+
+const photographedRemoteControls = [
+  "power",
+  "mute",
+  "input",
+  "red",
+  "green",
+  "blue",
+  "up",
+  "left",
+  "ok",
+  "right",
+  "down",
+  "back",
+  "volume-up",
+  "home",
+  "menu",
+  "volume-down",
+  "settings",
+  "app1",
+  "app2",
+  "mic",
+] as const;
 
 describe("Dashboard", () => {
   it("shows connected runtime state and immediate controller feedback", () => {
@@ -66,12 +90,22 @@ describe("Dashboard", () => {
     expect(screen.getByText("移动鼠标光标")).toBeInTheDocument();
   });
 
-  it("shows the TCL remote workspace in direct BLE mode", () => {
-    render(
+  it("shows the real TCL remote with verified Windows HID feedback", () => {
+    const { container } = render(
       <Dashboard
         state={{
           ...connectedState,
-          controls: { remoteOk: 1, remoteMic: 0 },
+          controls: {
+            remoteUp: 1,
+            remoteDown: 0,
+            remoteLeft: 0,
+            remoteRight: 0,
+            remoteOk: 1,
+            remoteMic: 0,
+            remoteBrightnessUp: 1,
+            remoteBrightnessDown: 0,
+            remotePictureMode: 0,
+          },
           configuration: {
             controllerType: "tclRc901a",
             activeControllerIndex: 0,
@@ -90,8 +124,64 @@ describe("Dashboard", () => {
 
     expect(screen.getByText("TCL RC901A 已连接")).toBeInTheDocument();
     expect(screen.getByTestId("tcl-remote-visual")).toBeInTheDocument();
+    expect(screen.getByTestId("controller-photo")).toHaveAttribute(
+      "src",
+      expect.stringContaining("tcl-rc901a.jpg"),
+    );
+    expect(screen.getByTestId("control-remote-up")).toHaveAttribute("data-pressed", "true");
+    expect(screen.getByTestId("control-remote-down")).toHaveAttribute("data-pressed", "false");
+    expect(screen.getByTestId("control-remote-left")).toHaveAttribute("data-pressed", "false");
+    expect(screen.getByTestId("control-remote-right")).toHaveAttribute("data-pressed", "false");
     expect(screen.getByTestId("control-remote-ok")).toHaveAttribute("data-pressed", "true");
-    expect(screen.getByText("直接 BLE 模式")).toBeInTheDocument();
+    expect(container.querySelectorAll('[data-verified="true"]')).toHaveLength(22);
+    for (const control of photographedRemoteControls) {
+      expect(screen.getByTestId(`control-remote-${control}`)).toBeInTheDocument();
+    }
+    expect(screen.getByTestId("control-remote-brightness-up")).toHaveAttribute(
+      "data-pressed",
+      "true",
+    );
+    expect(screen.getByTestId("control-remote-brightness-down")).toHaveAttribute(
+      "data-pressed",
+      "false",
+    );
+    expect(screen.getByTestId("control-remote-picture-mode")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "遥控器侧边按键" })).toBeInTheDocument();
+    expect(screen.getByText(
+      "专用驱动会自动识别 22 个已验证按键；无需逐键学习，连接后即可映射。",
+    )).toBeInTheDocument();
+    expect(screen.getByText("Windows HID")).toBeInTheDocument();
+    expect(screen.getByText("22 键自动就绪")).toBeInTheDocument();
+    expect(screen.queryByText("直接 BLE 模式")).not.toBeInTheDocument();
+  });
+
+  it("dims the complete TCL remote workspace when disconnected", () => {
+    const { container } = render(
+      <Dashboard
+        state={{
+          ...connectedState,
+          connectionState: "disconnected",
+          configuration: {
+            controllerType: "tclRc901a",
+            activeControllerIndex: 0,
+            codexOnly: true,
+            dictationShortcut: "Ctrl+Alt+Shift+F12",
+            mouseSpeed: 50,
+            scrollSpeed: 50,
+            deadZone: 0.12,
+            startWithWindows: false,
+            mappings: {},
+          },
+        }}
+        onToggleMapping={vi.fn()}
+      />,
+    );
+
+    const disconnectedCard = container.querySelector('.controller-card[data-disconnected="true"]');
+    expect(disconnectedCard).toContainElement(screen.getByTestId("tcl-remote-visual"));
+    expect(globalStyles).toContain(
+      '.controller-card[data-disconnected="true"] .controller-photo-stage,\n.controller-card[data-disconnected="true"] .tcl-remote-stage {',
+    );
   });
 
   it("pauses mapping from the primary control", () => {

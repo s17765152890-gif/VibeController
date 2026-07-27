@@ -54,4 +54,34 @@ describe("AppBridge", () => {
       payload: { enabled: false },
     });
   });
+
+  it("serializes every RC901A learning command with the payload expected by the host", () => {
+    const postMessage = vi.fn();
+    const bridge = createAppBridge({
+      postMessage,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    });
+
+    bridge.send("startRc901aLearning", {
+      control: "remoteMic",
+      compatibilityOverride: true,
+    });
+    bridge.send("confirmRc901aLearning", { sessionId: "session-1" });
+    bridge.send("retryRc901aLearning", { sessionId: "session-1" });
+    bridge.send("cancelRc901aLearning", { sessionId: "session-1" });
+    bridge.send("resetRc901aLearnedBindings", {});
+
+    expect(postMessage.mock.calls.map(([message]) => message)).toEqual([
+      {
+        version: 1,
+        type: "startRc901aLearning",
+        payload: { control: "remoteMic", compatibilityOverride: true },
+      },
+      { version: 1, type: "confirmRc901aLearning", payload: { sessionId: "session-1" } },
+      { version: 1, type: "retryRc901aLearning", payload: { sessionId: "session-1" } },
+      { version: 1, type: "cancelRc901aLearning", payload: { sessionId: "session-1" } },
+      { version: 1, type: "resetRc901aLearnedBindings", payload: {} },
+    ]);
+  });
 });

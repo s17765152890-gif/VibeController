@@ -49,6 +49,12 @@ export default function App() {
           codexHook={state.configuration?.codexHook}
           codexActivity={state.configuration?.codexActivity}
           rc901a={state.configuration?.rc901a}
+          rc901aInput={state.configuration?.rc901aInput}
+          persistedControllerType={state.configuration?.controllerType}
+          rc901aLearningReady={
+            state.configuration?.rc901a?.connectionState === "connected" ||
+            state.configuration?.rc901a?.connectionState === "connectedLimited"
+          }
           onSave={(settings) => {
             setState((current) => ({
               ...current,
@@ -58,6 +64,7 @@ export default function App() {
               configuration: current.configuration ? {
                 ...current.configuration,
                 ...settings,
+                controllerType: current.configuration.controllerType,
               } : current.configuration,
             }));
             appBridge.send("updateSettings", settings);
@@ -65,6 +72,16 @@ export default function App() {
           onRefreshIntegrations={() => appBridge.send("refreshIntegrations", {})}
           onRefreshRc901a={() => appBridge.send("refreshRc901a", {})}
           onClearRc901aSamples={() => appBridge.send("clearRc901aSamples", {})}
+          onStartRc901aLearning={(control, compatibilityOverride) =>
+            appBridge.send("startRc901aLearning", {
+              control,
+              compatibilityOverride,
+            })
+          }
+          onConfirmRc901aLearning={(sessionId) => appBridge.send("confirmRc901aLearning", { sessionId })}
+          onRetryRc901aLearning={(sessionId) => appBridge.send("retryRc901aLearning", { sessionId })}
+          onCancelRc901aLearning={(sessionId) => appBridge.send("cancelRc901aLearning", { sessionId })}
+          onResetRc901aLearnedBindings={() => appBridge.send("resetRc901aLearnedBindings", {})}
           onCopyDiagnostics={() => {
             void navigator.clipboard?.writeText(JSON.stringify({ version: "0.1.0", runtime: state }, null, 2));
             appBridge.send("requestState", { copyDiagnostics: true });

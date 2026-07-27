@@ -153,9 +153,21 @@ describe("MappingEditor", () => {
     expect(screen.getByRole("button", { name: "主页键" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "麦克风键" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "音量 +" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "电源键" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "输入源键" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "红色键" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "绿色键" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "蓝色键" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "设置键" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "bilibili 键" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "奇异果 TV 键" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "爱奇艺键" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "频道 +" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "数字键 0" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "保存映射" }));
 
-    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+    const saved = onSave.mock.calls[0][0] as Record<string, string>;
+    expect(saved).toEqual(expect.objectContaining({
       remoteOk: "send",
       remoteBack: "shortcut:Backspace",
       remoteHome: "activateCodex",
@@ -163,6 +175,22 @@ describe("MappingEditor", () => {
       remoteMic: "dictation",
       remoteLeft: "shortcut:ArrowLeft",
       remoteRight: "shortcut:ArrowRight",
+      remotePower: "none",
+      remoteInput: "none",
+      remoteRed: "none",
+      remoteGreen: "none",
+      remoteBlue: "none",
+      remoteSettings: "none",
+      remoteApp1: "none",
+      remoteApp2: "none",
+      remoteBrightnessUp: "none",
+      remoteBrightnessDown: "none",
+      remotePictureMode: "none",
     }));
+    expect(screen.getByRole("button", { name: "亮度 +" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "亮度 −" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "图像模式" })).toBeInTheDocument();
+    expect(saved).not.toHaveProperty("remoteChannelUp");
+    expect(saved).not.toHaveProperty("remoteDigit0");
   });
 });
