@@ -32,6 +32,15 @@ Describe 'RC901A capture-filter scripts' {
         $installContent | Should Match 'IsNullOrWhiteSpace\(\$StatePath\)'
         $uninstallContent | Should Match 'IsNullOrWhiteSpace\(\$StatePath\)'
     }
+
+    It 'keeps production validation mandatory and the development bypass explicit' {
+        $installContent = Get-Content -LiteralPath $installScript -Raw
+
+        $installContent | Should Match '\[switch\]\$AllowTestPackage'
+        $installContent | Should Match 'Test-Rc901aProductionPackage\.ps1'
+        $installContent | Should Match 'Get-Rc901aProductionPackage'
+        $installContent | Should Match '-AllowTestPackage:\$AllowTestPackage'
+    }
 }
 
 if ((Test-Path -LiteralPath $installScript) -and (Test-Path -LiteralPath $uninstallScript)) {
@@ -71,6 +80,44 @@ if ((Test-Path -LiteralPath $installScript) -and (Test-Path -LiteralPath $uninst
                 -CatalogSignatureStatus 'NotSigned' `
                 -StatePath 'C:\state\before.json' `
                 -Apply } | Should Throw
+        }
+
+        It 'refuses Apply for a merely Valid catalog without the production release gate' {
+            { New-Rc901aCaptureInstallPlan `
+                -InstanceId 'BTHLEDevice\exact-instance' `
+                -HardwareIds @($exactHardwareId) `
+                -InfPath 'C:\package\Rc901aHidFilter.inf' `
+                -CatalogSignatureStatus 'Valid' `
+                -StatePath 'C:\state\before.json' `
+                -Apply } | Should Throw
+        }
+
+        It 'allows Apply after the production package gate succeeds' {
+            $plan = New-Rc901aCaptureInstallPlan `
+                -InstanceId 'BTHLEDevice\exact-instance' `
+                -HardwareIds @($exactHardwareId) `
+                -InfPath 'C:\package\Rc901aHidFilter.inf' `
+                -CatalogSignatureStatus 'Valid' `
+                -StatePath 'C:\state\before.json' `
+                -ProductionReady `
+                -Apply
+
+            $plan.ProductionReady | Should Be $true
+            $plan.DevelopmentOnly | Should Be $false
+        }
+
+        It 'labels the explicit test-package path as development-only' {
+            $plan = New-Rc901aCaptureInstallPlan `
+                -InstanceId 'BTHLEDevice\exact-instance' `
+                -HardwareIds @($exactHardwareId) `
+                -InfPath 'C:\package\Rc901aHidFilter.inf' `
+                -CatalogSignatureStatus 'Valid' `
+                -StatePath 'C:\state\before.json' `
+                -AllowTestPackage `
+                -Apply
+
+            $plan.ProductionReady | Should Be $false
+            $plan.DevelopmentOnly | Should Be $true
         }
     }
 

@@ -4,6 +4,7 @@ param(
     [string]$InstanceId,
     [string]$StatePath,
     [switch]$Apply,
+    [switch]$AllowTestPackage,
     [switch]$FunctionsOnly
 )
 
@@ -17,6 +18,7 @@ if ([string]::IsNullOrWhiteSpace($StatePath)) {
 }
 
 . (Join-Path $PSScriptRoot 'Get-Rc901aDriverState.ps1') -StateFunctionsOnly
+. (Join-Path $PSScriptRoot 'Test-Rc901aProductionPackage.ps1') -FunctionsOnly
 
 function Assert-Rc901aExactHardwareIds {
     [CmdletBinding()]
@@ -52,6 +54,10 @@ function New-Rc901aCaptureInstallPlan {
         [Parameter(Mandatory)]
         [string]$StatePath,
 
+        [switch]$ProductionReady,
+
+        [switch]$AllowTestPackage,
+
         [switch]$Apply
     )
 
@@ -65,6 +71,12 @@ function New-Rc901aCaptureInstallPlan {
     if ($Apply -and -not $packageTrusted) {
         throw "Refusing Apply: the driver catalog signature status is '$CatalogSignatureStatus', not 'Valid'."
     }
+    if ($ProductionReady -and $AllowTestPackage) {
+        throw 'Refusing operation: production-ready and development-only package modes are mutually exclusive.'
+    }
+    if ($Apply -and -not $ProductionReady -and -not $AllowTestPackage) {
+        throw 'Refusing Apply: the RC901A package has not passed the production release gate. Development packages require the explicit AllowTestPackage switch.'
+    }
 
     $uninstallScript = Join-Path $PSScriptRoot 'Uninstall-Rc901aCaptureFilter.ps1'
     [pscustomobject]@{
@@ -75,6 +87,17 @@ function New-Rc901aCaptureInstallPlan {
         InfPath = $InfPath
         CatalogSignatureStatus = $CatalogSignatureStatus
         PackageTrusted = $packageTrusted
+        ProductionReady = [bool]$ProductionReady
+        DevelopmentOnly = [bool]$AllowTestPackage
+        ReleaseGate = if ($ProductionReady) {
+            'Production'
+        }
+        elseif ($AllowTestPackage) {
+            'ExplicitDevelopmentOverride'
+        }
+        else {
+            'NotEvaluatedInPreview'
+        }
         StatePath = $StatePath
         PlannedAction = "Stage and install only $InfPath for the exact RC901A device."
         RollbackCommand = "& '$uninstallScript' -StatePath '$StatePath' -Apply"
@@ -226,11 +249,17 @@ function Invoke-Rc901aCaptureFilterInstall {
         [Parameter(Mandatory)]
         [string]$RollbackStatePath,
 
+        [switch]$AllowTestPackage,
+
         [switch]$Apply
     )
 
     $effectiveApply = $Apply -and -not $WhatIfPreference
     $package = Get-Rc901aCapturePackage -Directory $DriverPackageDirectory
+    $productionReport = $null
+    if ($effectiveApply -and -not $AllowTestPackage) {
+        $productionReport = Get-Rc901aProductionPackage -Directory $DriverPackageDirectory
+    }
     $device = Get-Rc901aExactDeviceState -DeviceInstanceId $DeviceInstanceId
     $plan = New-Rc901aCaptureInstallPlan `
         -InstanceId $device.InstanceId `
@@ -238,6 +267,8 @@ function Invoke-Rc901aCaptureFilterInstall {
         -InfPath $package.InfPath `
         -CatalogSignatureStatus $package.CatalogSignatureStatus `
         -StatePath $RollbackStatePath `
+        -ProductionReady:($null -ne $productionReport -and $productionReport.ProductionReady) `
+        -AllowTestPackage:$AllowTestPackage `
         -Apply:$effectiveApply
 
     if (-not $effectiveApply) {
@@ -261,6 +292,9 @@ function Invoke-Rc901aCaptureFilterInstall {
             ProviderName = 'VibeController'
             CatalogSignatureStatus = $package.CatalogSignatureStatus
             CatalogSigner = $package.CatalogSigner
+            ProductionReady = $plan.ProductionReady
+            DevelopmentOnly = $plan.DevelopmentOnly
+            ProductionValidation = $productionReport
         }
     }
     $stateRecord | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $RollbackStatePath -Encoding UTF8
@@ -299,5 +333,6 @@ if (-not $FunctionsOnly) {
         -DeviceInstanceId $InstanceId `
         -RollbackStatePath $StatePath `
         -Apply:$Apply `
+        -AllowTestPackage:$AllowTestPackage `
         -WhatIf:$entryWhatIf
 }
