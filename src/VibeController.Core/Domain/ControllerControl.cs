@@ -63,4 +63,7 @@ public enum ControllerControl
     RemoteSettings,
     RemoteApp1,
     RemoteApp2,
+    RemoteBrightnessUp,
+    RemoteBrightnessDown,
+    RemotePictureMode,
 }
