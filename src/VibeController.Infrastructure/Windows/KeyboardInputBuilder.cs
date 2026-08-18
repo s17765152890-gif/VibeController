@@ -16,6 +16,9 @@ public enum VirtualKey : ushort
     Shift = 0x10,
     Control = 0x11,
     Alt = 0x12,
+    RightAlt = 0xA5,
+    RightControl = 0xA3,
+    RightShift = 0xA1,
     Escape = 0x1B,
     Space = 0x20,
     PageUp = 0x21,
@@ -175,6 +178,9 @@ public static class KeyboardInputBuilder
             "CTRL" or "CONTROL" => VirtualKey.Control,
             "SHIFT" => VirtualKey.Shift,
             "ALT" or "OPTION" => VirtualKey.Alt,
+            "RALT" or "RIGHTALT" => VirtualKey.RightAlt,
+            "RCONTROL" or "RIGHTCONTROL" => VirtualKey.RightControl,
+            "RSHIFT" or "RIGHTSHIFT" => VirtualKey.RightShift,
             "WIN" or "WINDOWS" or "META" or "SUPER" or "CMD" or "COMMAND" =>
                 VirtualKey.Windows,
             ";" or "SEMICOLON" => VirtualKey.OemSemicolon,
@@ -199,3 +205,5 @@ public static class KeyboardInputBuilder
             ? virtualKey
             : throw new ArgumentException($"不支持的键盘按键：{key}", nameof(key));
 }
+
+

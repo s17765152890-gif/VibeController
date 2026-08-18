@@ -74,6 +74,7 @@ public sealed class SendInputNativeSender : INativeInputSender
     private const uint InputMouse = 0;
     private const uint InputKeyboard = 1;
     private const uint KeyEventKeyUp = 0x0002;
+    private const uint KeyEventExtended = 0x0001;
     private const uint MouseEventMove = 0x0001;
     private const uint MouseEventLeftDown = 0x0002;
     private const uint MouseEventLeftUp = 0x0004;
@@ -91,7 +92,10 @@ public sealed class SendInputNativeSender : INativeInputSender
                 Keyboard = new KeyboardInput
                 {
                     VirtualKey = (ushort)stroke.Key,
-                    Flags = stroke.Direction == KeyDirection.Up ? KeyEventKeyUp : 0,
+                                    Flags = (stroke.Direction == KeyDirection.Up ? KeyEventKeyUp : 0)
+                            | (stroke.Key is VirtualKey.RightAlt or VirtualKey.RightControl or VirtualKey.RightShift
+                                ? KeyEventExtended
+                                : 0),
                 },
             },
         };
